@@ -62,7 +62,7 @@
     input[type=checkbox] { cursor: pointer; transform: scale(1.2); }
     input:disabled { opacity: 0.5; cursor: not-allowed; }
     .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; display: none; }
-    .modal-box { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 8px; width: 400px; text-align: center; }
+    .modal-box { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 8px; width: 400px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
     .modal-title { font-size: 1.3rem; color: var(--primary); font-weight: bold; margin-bottom: 15px; }
     .modal-textarea { width: 100%; height: 80px; padding: 10px; margin-bottom: 10px; resize: none; border: 1px solid #ccc; }
     .modal-input { width: 100%; padding: 8px; margin-bottom: 15px; border: 1px solid #ccc; }
@@ -85,23 +85,35 @@
     .map-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 15px; background: #fafafa; padding: 15px; border: 1px solid #eee; }
     .map-field label { display: block; font-size: 0.75rem; font-weight: bold; color: #555; margin-bottom: 3px; }
     .map-field select { width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 3px; font-size: 0.8rem; }
+    
+    /* Custom Alert UI */
+    .custom-alert-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; display: none; align-items: center; justify-content: center; }
+    .custom-alert-msg { margin-bottom: 20px; font-size: 1rem; color: #333; }
+    
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
+
+  <div id="custom-modal-overlay" class="custom-alert-overlay">
+    <div class="modal-box">
+      <h3 id="custom-modal-title" style="margin-top:0; color:var(--primary);">Notification</h3>
+      <div id="custom-modal-msg" class="custom-alert-msg"></div>
+      <div class="modal-actions">
+        <button id="btn-custom-cancel" class="btn-cancel" style="display:none;">Cancel</button>
+        <button id="btn-custom-ok" class="btn-confirm">OK</button>
+      </div>
+    </div>
+  </div>
 
   <div id="initial-loader" class="loader-overlay"><div class="loader-spinner"></div><div style="font-weight:bold; color:#00505c">Loading...</div></div>
   <div class="navbar"><div style="display:flex;align-items:center;gap:20px;"><button id="btn-back" class="btn-back" onclick="goBack()">← Back</button><img id="app-logo" class="navbar-logo" style="display:none; padding: 2px;"><h2>Feb 2026 - BulkPack Review</h2></div><div id="current-user" style="font-size:0.9rem;opacity:0.9"></div></div>
   
   <div id="login-view">
     <div class="login-box">
-      <h3 style="margin-top:0; color:var(--primary)">Identity Selection</h3>
-      <div class="role-switch">
-        <label><input type="radio" name="role" value="AE" checked onchange="switchRole()"><span>Account Exec</span></label>
-        <label><input type="radio" name="role" value="SC" onchange="switchRole()"><span>Sales Coord</span></label>
-        <label><input type="radio" name="role" value="MGR" onchange="switchRole()"><span>Manager</span></label>
-        <label><input type="radio" name="role" value="ADMIN" onchange="switchRole()"><span>Admin</span></label>
-      </div>
+      <h3 id="login-title" style="margin-top:0; color:var(--primary)">Identity Selection</h3>
+      <div class="role-switch" id="role-container">
+        </div>
       <div class="dropdown-container" id="dropdown-wrapper">
         <input type="text" id="user-input" class="dropdown-input" placeholder="Select or type name..." onkeyup="filterDropdown()" onfocus="showDropdown()">
         <div id="user-list" class="dropdown-list"></div>
@@ -225,8 +237,10 @@
   <div id="impact-modal" class="modal-overlay"><div class="modal-box"><h3>Impacted Accounts</h3><div id="impact-list" class="modal-list-container"></div><div class="modal-actions"><button class="btn-confirm" onclick="closeImpactModal()">Close</button></div></div></div>
 
   <script>
+    const PAGE_CONTEXT = "<?= pageContext ?>";
+
     let ROW_DATA = []; let PORTFOLIO_STATUS = "Not Submitted"; let USER_CACHE = { AE: [], SC: [] }; let CURRENT_LIST = []; 
-    let CAMPAIGN_RULES = []; let pendingAction = null; let debounceTimer;
+    let CAMPAIGN_RULES = []; let pendingAction = null; let debounceTimer; let confirmCallback = null;
 
     const DEFAULT_START_DATE = "2026-02-25";
 
@@ -243,9 +257,47 @@
       { id: 'hmap_mgr', label: 'Manager Name' }, { id: 'hmap_reg', label: 'Region' }, { id: 'hmap_email', label: 'AE Email' }
     ];
 
+    // --- CUSTOM UI ALERTS/CONFIRMS ---
+    function customAlert(msg, title = "Notification") {
+      document.getElementById('custom-modal-title').innerText = title;
+      document.getElementById('custom-modal-msg').innerHTML = msg;
+      document.getElementById('btn-custom-cancel').style.display = 'none';
+      document.getElementById('btn-custom-ok').onclick = () => { document.getElementById('custom-modal-overlay').style.display = 'none'; };
+      document.getElementById('custom-modal-overlay').style.display = 'flex';
+    }
+
+    function customConfirm(msg, callback, title = "Confirmation") {
+      document.getElementById('custom-modal-title').innerText = title;
+      document.getElementById('custom-modal-msg').innerHTML = msg;
+      document.getElementById('btn-custom-cancel').style.display = 'inline-block';
+      confirmCallback = callback;
+      
+      document.getElementById('btn-custom-ok').onclick = () => { 
+        document.getElementById('custom-modal-overlay').style.display = 'none'; 
+        if(confirmCallback) confirmCallback(); 
+      };
+      document.getElementById('btn-custom-cancel').onclick = () => { 
+        document.getElementById('custom-modal-overlay').style.display = 'none'; 
+        confirmCallback = null;
+      };
+      document.getElementById('custom-modal-overlay').style.display = 'flex';
+    }
+
     document.addEventListener('DOMContentLoaded', initData);
 
     function initData() {
+      const container = document.getElementById('role-container');
+      if (PAGE_CONTEXT === 'admin') {
+          document.getElementById('login-title').innerText = "Admin Access";
+          container.innerHTML = '<label><input type="radio" name="role" value="ADMIN" checked style="display:none;"></label>';
+      } else if (PAGE_CONTEXT === 'manager') {
+          document.getElementById('login-title').innerText = "Manager Access";
+          container.innerHTML = '<label><input type="radio" name="role" value="MGR" checked style="display:none;"></label>';
+      } else {
+          document.getElementById('login-title').innerText = "Identity Selection";
+          container.innerHTML = '<label><input type="radio" name="role" value="AE" checked onchange="switchRole()"><span>Account Exec</span></label><label><input type="radio" name="role" value="SC" onchange="switchRole()"><span>Sales Coord</span></label>';
+      }
+
       const loader = document.getElementById('initial-loader');
       loader.style.display = 'flex';
       google.script.run.withSuccessHandler(data => { USER_CACHE = data; switchRole(); loader.style.display = 'none'; }).getAllUsers();
@@ -253,7 +305,8 @@
     }
     
     function switchRole() {
-      const role = document.querySelector('input[name="role"]:checked').value;
+      const roleElement = document.querySelector('input[name="role"]:checked');
+      const role = roleElement ? roleElement.value : 'AE';
       const wrapper = document.getElementById('dropdown-wrapper');
       const startBtn = document.getElementById('btn-start');
 
@@ -282,7 +335,7 @@
         document.getElementById('manager-table-container').innerHTML = '<div class="loading">Loading...</div>';
         google.script.run.withSuccessHandler(renderManagerTable).getManagerSummary();
       } else {
-        const user = document.getElementById('user-input').value; if(!user) return alert("Select user.");
+        const user = document.getElementById('user-input').value; if(!user) { document.getElementById('login-view').style.display = 'flex'; document.getElementById('btn-back').style.display = 'none'; return customAlert("Select user."); }
         document.getElementById('dashboard-view').style.display = 'block'; document.getElementById('current-user').innerText = `${role}: ${user}`;
         
         document.getElementById('table-container').innerHTML = `
@@ -314,7 +367,7 @@
           </table>
         `;
 
-        google.script.run.withSuccessHandler(r => { ROW_DATA = r.items; PORTFOLIO_STATUS = r.portfolioStatus; renderTable(); }).withFailureHandler(err => { alert(err.message); goBack(); }).getItemsForUser(user, role);
+        google.script.run.withSuccessHandler(r => { ROW_DATA = r.items; PORTFOLIO_STATUS = r.portfolioStatus; renderTable(); }).withFailureHandler(err => { customAlert(err.message); goBack(); }).getItemsForUser(user, role);
       }
     }
 
@@ -324,13 +377,24 @@
     }
 
     // --- ADMIN MAPPING ---
-    function fetchCsvHeaders() { const folderId = document.getElementById('drive-folder-id').value; if (!folderId) return alert("Need Folder ID"); const btn = document.getElementById('btn-fetch-csv'); btn.innerText = "Fetching..."; btn.disabled = true; google.script.run.withSuccessHandler(h => { btn.innerText = "Fetch Headers"; btn.disabled = false; let opts = `<option value="">-- Ignore --</option>` + h.map((head, i) => `<option value="${i}">${head}</option>`).join(''); document.getElementById('map-grid-items').innerHTML = REQUIRED_MAPPING_FIELDS.map(f => `<div class="map-field"><label>${f.label}</label><select id="${f.id}">${opts}</select></div>`).join(''); document.getElementById('mapping-container').style.display = 'block'; }).withFailureHandler(err => { btn.innerText = "Fetch Headers"; btn.disabled = false; alert(err.message); }).getHeadersFromCSVFolder(folderId); }
-    function fetchHierarchyHeaders() { const sId = document.getElementById('hier-sheet-id').value; const tName = document.getElementById('hier-tab-name').value; if(!sId || !tName) return alert("Need Sheet ID and Tab Name"); const btn = document.getElementById('btn-fetch-hier'); btn.innerText = "Loading..."; btn.disabled = true; google.script.run.withSuccessHandler(h => { btn.innerText = "Fetch Headers"; btn.disabled = false; let opts = `<option value="">-- Ignore --</option>` + h.map((head, i) => `<option value="${i}">${head}</option>`).join(''); document.getElementById('hier-grid-items').innerHTML = HIERARCHY_MAPPING_FIELDS.map(f => `<div class="map-field"><label>${f.label}</label><select id="${f.id}">${opts}</select></div>`).join(''); document.getElementById('hier-mapping-container').style.display = 'block'; }).withFailureHandler(err => { btn.innerText = "Fetch Headers"; btn.disabled = false; alert(err.message); }).getHeadersFromHierarchySheet(sId, tName); }
-    function loadSegmentsFromCSV() { const payload = { csvFolderId: document.getElementById('drive-folder-id').value, csvMap: {} }; REQUIRED_MAPPING_FIELDS.forEach(f => { payload.csvMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : ""; }); if(!payload.csvFolderId || document.getElementById('map-grid-items').innerHTML === "") { return alert("Please complete Step 1 (CSV Ingestion & Mapping) first."); } const btn = document.getElementById('btn-load-segments'); btn.innerText = "Scanning CSVs..."; btn.disabled = true; google.script.run.withSuccessHandler(dims => { btn.innerText = "Segments Loaded!"; if (!dims) return; ['admin-seg1','admin-seg2','admin-seg3','admin-seg4','admin-seg5','admin-class'].forEach(id => { let key = id.replace('admin-',''); if(key==='class') key='classCode'; document.getElementById(id).innerHTML = `<option value="ALL">-- ALL --</option>` + dims[key].map(v => `<option value="${v}">${v}</option>`).join(''); }); document.getElementById('rules-grid-container').style.display = 'block'; }).withFailureHandler(err => { btn.innerText = "Load Segments from Mapped CSVs"; btn.disabled = false; alert(err.message); }).getCampaignDimensionsFromCSV(payload); }
-    function addCampaignRule() { const pct = parseFloat(document.getElementById('admin-pct').value); if(isNaN(pct)) return alert("Valid % required."); CAMPAIGN_RULES.push({ seg1: document.getElementById('admin-seg1').value, seg2: document.getElementById('admin-seg2').value, seg3: document.getElementById('admin-seg3').value, seg4: document.getElementById('admin-seg4').value, seg5: document.getElementById('admin-seg5').value, classCode: document.getElementById('admin-class').value, pct: pct }); renderAdminRules(); }
+    function fetchCsvHeaders() { const folderId = document.getElementById('drive-folder-id').value; if (!folderId) return customAlert("Need Folder ID"); const btn = document.getElementById('btn-fetch-csv'); btn.innerText = "Fetching..."; btn.disabled = true; google.script.run.withSuccessHandler(h => { btn.innerText = "Fetch Headers"; btn.disabled = false; let opts = `<option value="">-- Ignore --</option>` + h.map((head, i) => `<option value="${i}">${head}</option>`).join(''); document.getElementById('map-grid-items').innerHTML = REQUIRED_MAPPING_FIELDS.map(f => `<div class="map-field"><label>${f.label}</label><select id="${f.id}">${opts}</select></div>`).join(''); document.getElementById('mapping-container').style.display = 'block'; }).withFailureHandler(err => { btn.innerText = "Fetch Headers"; btn.disabled = false; customAlert(err.message); }).getHeadersFromCSVFolder(folderId); }
+    function fetchHierarchyHeaders() { const sId = document.getElementById('hier-sheet-id').value; const tName = document.getElementById('hier-tab-name').value; if(!sId || !tName) return customAlert("Need Sheet ID and Tab Name"); const btn = document.getElementById('btn-fetch-hier'); btn.innerText = "Loading..."; btn.disabled = true; google.script.run.withSuccessHandler(h => { btn.innerText = "Fetch Headers"; btn.disabled = false; let opts = `<option value="">-- Ignore --</option>` + h.map((head, i) => `<option value="${i}">${head}</option>`).join(''); document.getElementById('hier-grid-items').innerHTML = HIERARCHY_MAPPING_FIELDS.map(f => `<div class="map-field"><label>${f.label}</label><select id="${f.id}">${opts}</select></div>`).join(''); document.getElementById('hier-mapping-container').style.display = 'block'; }).withFailureHandler(err => { btn.innerText = "Fetch Headers"; btn.disabled = false; customAlert(err.message); }).getHeadersFromHierarchySheet(sId, tName); }
+    function loadSegmentsFromCSV() { const payload = { csvFolderId: document.getElementById('drive-folder-id').value, csvMap: {} }; REQUIRED_MAPPING_FIELDS.forEach(f => { payload.csvMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : ""; }); if(!payload.csvFolderId || document.getElementById('map-grid-items').innerHTML === "") { return customAlert("Please complete Step 1 (CSV Ingestion & Mapping) first."); } const btn = document.getElementById('btn-load-segments'); btn.innerText = "Scanning CSVs..."; btn.disabled = true; google.script.run.withSuccessHandler(dims => { btn.innerText = "Segments Loaded!"; if (!dims) return; ['admin-seg1','admin-seg2','admin-seg3','admin-seg4','admin-seg5','admin-class'].forEach(id => { let key = id.replace('admin-',''); if(key==='class') key='classCode'; document.getElementById(id).innerHTML = `<option value="ALL">-- ALL --</option>` + dims[key].map(v => `<option value="${v}">${v}</option>`).join(''); }); document.getElementById('rules-grid-container').style.display = 'block'; }).withFailureHandler(err => { btn.innerText = "Load Segments from Mapped CSVs"; btn.disabled = false; customAlert(err.message); }).getCampaignDimensionsFromCSV(payload); }
+    function addCampaignRule() { const pct = parseFloat(document.getElementById('admin-pct').value); if(isNaN(pct)) return customAlert("Valid % required."); CAMPAIGN_RULES.push({ seg1: document.getElementById('admin-seg1').value, seg2: document.getElementById('admin-seg2').value, seg3: document.getElementById('admin-seg3').value, seg4: document.getElementById('admin-seg4').value, seg5: document.getElementById('admin-seg5').value, classCode: document.getElementById('admin-class').value, pct: pct }); renderAdminRules(); }
     function removeAdminRule(index) { CAMPAIGN_RULES.splice(index, 1); renderAdminRules(); }
     function renderAdminRules() { const tb = document.getElementById('admin-rules-body'); if (CAMPAIGN_RULES.length === 0) return tb.innerHTML = `<tr><td colspan="8" style="text-align:center;">No rules.</td></tr>`; tb.innerHTML = CAMPAIGN_RULES.map((r, i) => `<tr><td>${r.seg1}</td><td>${r.seg2}</td><td>${r.seg3}</td><td>${r.seg4}</td><td>${r.seg5}</td><td>${r.classCode}</td><td class="sugg-price">+${r.pct}%</td><td><button class="btn-remove-rule" onclick="removeAdminRule(${i})">Remove</button></td></tr>`).join(''); }
-    function executeFullPipeline() { if(!confirm("Are you sure? This will execute the Campaign ETL and write new Shard files per AE to Drive.")) return; const payload = { csvFolderId: document.getElementById('drive-folder-id').value, csvMap: {}, hierSheetId: document.getElementById('hier-sheet-id').value, hierTab: document.getElementById('hier-tab-name').value, hierMap: {}, campaignRules: CAMPAIGN_RULES }; REQUIRED_MAPPING_FIELDS.forEach(f => payload.csvMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : ""); if(payload.csvMap.map_ae === "") return alert("CSV Map: 'AE Name' is mandatory for Hub and Spoke routing."); HIERARCHY_MAPPING_FIELDS.forEach(f => payload.hierMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : ""); if(payload.hierMap.hmap_ae === "") return alert("Hierarchy Map: 'AE Name' is mandatory to join data."); const btn = document.getElementById('btn-exec-pipeline'); const resDiv = document.getElementById('pipeline-results'); btn.innerText = "PROCESSING PIPELINE... (DO NOT CLOSE)"; btn.disabled = true; resDiv.innerHTML = "Working... This may take several minutes depending on volume."; google.script.run.withSuccessHandler(r => { btn.innerText = "EXECUTE PIPELINE"; btn.disabled = false; let h = `<strong style="color:var(--pos)">SUCCESS! Processed ${r.processed} Rows into Hub & Spoke Shards.</strong><br><a href="${r.folderUrl}" target="_blank">Open Master Output Folder</a><br><br>`; r.files.forEach(f => h += `• ${f.key} (${f.count} rows) - <a href="${f.url}" target="_blank">View File</a><br>`); resDiv.innerHTML = h; }).withFailureHandler(e => { btn.innerText = "EXECUTE PIPELINE"; btn.disabled = false; resDiv.innerHTML = `<span style="color:red">Error: ${e.message}</span>`; }).runETLPipeline(payload); }
+    
+    function executeFullPipeline() { 
+      customConfirm("Are you sure? This will execute the Campaign ETL and write new Shard files per AE to Drive.", function() {
+        const payload = { csvFolderId: document.getElementById('drive-folder-id').value, csvMap: {}, hierSheetId: document.getElementById('hier-sheet-id').value, hierTab: document.getElementById('hier-tab-name').value, hierMap: {}, campaignRules: CAMPAIGN_RULES }; 
+        REQUIRED_MAPPING_FIELDS.forEach(f => payload.csvMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : ""); 
+        if(payload.csvMap.map_ae === "") return customAlert("CSV Map: 'AE Name' is mandatory for Hub and Spoke routing."); 
+        HIERARCHY_MAPPING_FIELDS.forEach(f => payload.hierMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : ""); 
+        if(payload.hierMap.hmap_ae === "") return customAlert("Hierarchy Map: 'AE Name' is mandatory to join data."); 
+        const btn = document.getElementById('btn-exec-pipeline'); const resDiv = document.getElementById('pipeline-results'); btn.innerText = "PROCESSING PIPELINE... (DO NOT CLOSE)"; btn.disabled = true; resDiv.innerHTML = "Working... This may take several minutes depending on volume."; 
+        google.script.run.withSuccessHandler(r => { btn.innerText = "EXECUTE PIPELINE"; btn.disabled = false; let h = `<strong style="color:var(--pos)">SUCCESS! Processed ${r.processed} Rows into Hub & Spoke Shards.</strong><br><a href="${r.folderUrl}" target="_blank">Open Master Output Folder</a><br><br>`; r.files.forEach(f => h += `• ${f.key} (${f.count} rows) - <a href="${f.url}" target="_blank">View File</a><br>`); resDiv.innerHTML = h; }).withFailureHandler(e => { btn.innerText = "EXECUTE PIPELINE"; btn.disabled = false; resDiv.innerHTML = `<span style="color:red">Error: ${e.message}</span>`; }).runETLPipeline(payload); 
+      });
+    }
 
     // --- DASHBOARD LOGIC ---
     function formatDateForInput(dateStr) { if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr; return DEFAULT_START_DATE; }
@@ -430,7 +494,7 @@
       if (isNaN(price)) return renderTable(); 
       
       if (price < item.currPrice) {
-          alert("Safeguard Alert: Final price cannot be set below the current price ($" + item.currPrice.toFixed(2) + ").");
+          customAlert("Safeguard Alert: Final price cannot be set below the current price ($" + item.currPrice.toFixed(2) + ").");
           return renderTable(); 
       }
 
@@ -451,7 +515,7 @@
       
       let newPrice = item.currPrice * (1 + (pct / 100));
       if (newPrice < item.currPrice) {
-          alert("Safeguard Alert: Final percentage cannot drop price below current. Percentage must be >= 0.");
+          customAlert("Safeguard Alert: Final percentage cannot drop price below current. Percentage must be >= 0.");
           return renderTable(); 
       }
 
@@ -497,7 +561,7 @@
     function openCommentModal(type, index) { pendingAction = { type: type, index: index }; document.getElementById('modal-comment').value = ROW_DATA[index] ? ROW_DATA[index].comment || "" : ""; document.getElementById('comment-modal').style.display = 'block'; }
     function confirmRejection() { 
       const reason = document.getElementById('modal-comment').value.trim(); 
-      if (!reason) return alert("Comment is required for 0% increases."); 
+      if (!reason) return customAlert("Comment is required for 0% increases."); 
       
       if (pendingAction.type === 'SINGLE') { 
          let item = ROW_DATA[pendingAction.index];
@@ -531,15 +595,15 @@
       const pctStr = document.getElementById('bulk-pct-input').value;
       const dateVal = document.getElementById('bulk-date-input').value;
       
-      if (!pctStr && !dateVal) return alert("Please enter a % or select a date to apply updates.");
+      if (!pctStr && !dateVal) return customAlert("Please enter a % or select a date to apply updates.");
       
       const selected = document.querySelectorAll('.row-chk:checked');
-      if (selected.length === 0) return alert("Select items first.");
+      if (selected.length === 0) return customAlert("Select items first.");
       
       let pct = NaN;
       if (pctStr !== "") {
           pct = parseInt(pctStr);
-          if (isNaN(pct) || pct < 0) return alert("Please enter a valid percentage >= 0.");
+          if (isNaN(pct) || pct < 0) return customAlert("Please enter a valid percentage >= 0.");
           if (pct === 0) {
               pendingAction = { type: 'BULK_ZERO', date: dateVal };
               document.getElementById('modal-comment').value = "";
@@ -610,9 +674,10 @@
     }
 
     function submitPortfolioAE() {
-       if(!confirm("Are you sure you want to submit your portfolio for Manager review?")) return;
-       const user = document.getElementById('user-input').value;
-       google.script.run.withSuccessHandler(()=>{ alert("Portfolio Submitted!"); start(); }).submitPortfolio(user);
+       customConfirm("Are you sure you want to submit your portfolio for Manager review?", function() {
+           const user = document.getElementById('user-input').value;
+           google.script.run.withSuccessHandler(()=>{ customAlert("Portfolio Submitted!"); start(); }).submitPortfolio(user);
+       });
     }
 
     function exportToExcel() {
