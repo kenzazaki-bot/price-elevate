@@ -32,7 +32,6 @@ function ensureColumns(sheet, requiredCols) {
   if (currentCols < requiredCols) sheet.insertColumnsAfter(currentCols, requiredCols - currentCols);
 }
 
-// Retrieves File ID from the central Directory
 function getAeFileId(aeName) {
   const dirSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Directory");
   if (!dirSheet) throw new Error("Directory tab not found. Admin must run the ETL pipeline first.");
@@ -130,7 +129,6 @@ function getManagerSummary() {
 
     const managerAgg = {};
     
-    // Loop through all shards to build the summary
     for (let d = 1; d < dirData.length; d++) {
       let aeName = dirData[d][0];
       let fileId = dirData[d][1];
@@ -172,7 +170,8 @@ function getManagerSummary() {
           if (g.status === "APPROVED") {
             aeStats.approved++;
             if (g.finalPrice !== "") aeStats.realized += (g.finalPrice - g.currPrice) * g.qty;
-          } else if (g.status === "REJECTED") { aeStats.rejected++; } 
+          } else if (g.status === "MODIFIED") { aeStats.approved++; if (g.finalPrice !== "") aeStats.realized += (g.finalPrice - g.currPrice) * g.qty; }
+          else if (g.status === "REJECTED") { aeStats.rejected++; } 
           else aeStats.pending++;
         });
 
@@ -208,7 +207,7 @@ function submitReview(updates, aeName) {
     ids.forEach(id => {
       if (u.decision) sheet.getRange(id, 34).setValue(u.decision);
       if (u.finalPrice !== undefined && u.finalPrice !== "") { sheet.getRange(id, 32).setValue(u.finalPrice); } 
-      else if (u.decision === "REJECTED") { sheet.getRange(id, 32).clearContent(); }
+      else if (u.decision === "REJECTED") { sheet.getRange(id, 32).setValue(u.currPrice); }
       if (u.startDate) sheet.getRange(id, 33).setValue(u.startDate);
       if (u.comment) sheet.getRange(id, 35).setValue(u.comment);
     });
@@ -216,9 +215,6 @@ function submitReview(updates, aeName) {
   return true;
 }
 
-/**
- * ADMIN DATA INGESTION & CSV MAPPING
- */
 function getHeadersFromCSVFolder(folderInput) {
   try {
     let folderId = folderInput.trim();
@@ -276,9 +272,6 @@ function getCampaignDimensionsFromCSV(payload) {
   } catch(e) { throw new Error("Dimension Load Error: " + e.toString()); }
 }
 
-/**
- * THE CORE ETL PIPELINE: Hub & Spoke Generation
- */
 function runETLPipeline(payload) {
   try {
     let sheetId = payload.hierSheetId.trim();
@@ -364,7 +357,6 @@ function runETLPipeline(payload) {
           outRow[28] = newSuggPrice.toFixed(2); 
           outRow[29] = ((newSuggPrice - currentPrice) * volume).toFixed(2); 
 
-          // SHARD INTO BUCKETS BY ACCOUNT EXECUTIVE
           let splitKey = outRow[24] ? String(outRow[24]).trim() : "Unassigned";
           if(!splitGroups[splitKey]) splitGroups[splitKey] = [];
           splitGroups[splitKey].push(outRow);
@@ -375,7 +367,6 @@ function runETLPipeline(payload) {
 
     if(totalRowsProcessed === 0) throw new Error("No data was processed. Ensure valid CSV files exist.");
 
-    // CREATE SHARDS AND DIRECTORY
     const timestamp = Utilities.formatDate(new Date(), "America/New_York", "yyyyMMdd_HHmm");
     const outFolder = DriveApp.createFolder(`BulkPack_AE_Shards_${timestamp}`);
     const results = [];
@@ -430,65 +421,6 @@ function getApprovedAccounts(selectedUser, role) {
   } catch(e) { return []; }
 }
 
-function generatePDF(selectedUser, role, acctNum) {
-  try {
-    const fileId = getAeFileId(selectedUser);
-    const sheet = SpreadsheetApp.openById(fileId).getSheetByName("Sheet1");
-    const data = sheet.getDataRange().getValues();
-    const targetUser = toJSONSafe(selectedUser, 'string').toLowerCase();
-    
-    let customerName = "Customer"; let startDateStr = "[Date]"; let itemsHtml = "";
-    
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i]; while (row.length < 40) row.push(""); 
-      let rowUser = role === 'SC' ? toJSONSafe(row[25], 'string').toLowerCase() : toJSONSafe(row[24], 'string').toLowerCase();
-      if (rowUser !== targetUser) continue;
-      if (toJSONSafe(row[33], 'string') !== "APPROVED") continue;
-      if (toJSONSafe(row[23], 'string') !== acctNum) continue;
-      
-      let rName = toJSONSafe(row[26], 'string'); if (rName) customerName = rName;
-      let storedDate = row[32];
-      if (startDateStr === "[Date]" && storedDate) {
-        if (storedDate instanceof Date) {
-           const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-           startDateStr = `${months[storedDate.getMonth()]} ${storedDate.getDate()}, ${storedDate.getFullYear()}`;
-        } else { startDateStr = storedDate; }
-      }
-
-      let product = toJSONSafe(row[3], 'string') || toJSONSafe(row[2], 'string');
-      let currentPrice = toJSONSafe(row[5], 'number'); let newPrice = toJSONSafe(row[31], 'number');
-      let pctIncrease = currentPrice > 0 ? (((newPrice - currentPrice) / currentPrice) * 100).toFixed(2) : 0;
-
-      itemsHtml += `<tr><td style="padding:8px; border-bottom:1px solid #eee;">${product}</td><td style="padding:8px; border-bottom:1px solid #eee;">$${currentPrice.toFixed(2)}</td><td style="padding:8px; border-bottom:1px solid #eee; font-weight:bold;">$${newPrice.toFixed(2)}</td><td style="padding:8px; border-bottom:1px solid #eee;">${pctIncrease}%</td></tr>`;
-    }
-
-    const today = new Date(); const monthsFull = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-    const dateString = `${monthsFull[today.getMonth()]} ${String(today.getDate()).padStart(2, '0')}, ${today.getFullYear()}`;
-
-    let html = `
-    <div style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333; padding: 40px;">
-      <p style="text-transform: uppercase;">${dateString}</p>
-      <p style="margin-top:20px; margin-bottom:30px;"><b>${customerName}</b><br>[Billing Address]<br>[Billing City, Province, Postal Code]</p>
-      <p style="font-weight: bold; font-size:16px;">Subject: Price Adjustments Notification</p>
-      <p>Dear Customer,</p>
-      <p>We value your continued partnership with Air Liquide Canada and are writing to inform you of an upcoming adjustment to your account pricing.</p>
-      <p>We continuously strive to optimize our operations to provide you with high-quality service and a reliable supply at competitive rates. While we have made every effort to absorb recent market fluctuations internally, we are currently facing exceptional and unanticipated cost pressures across our supply chain. Specifically, we are experiencing unprecedented volatility and sustained increases in fuel and energy costs, which have impacted our distribution and facility operations. Furthermore, global supply constraints continue to affect helium sourcing and raw material acquisition.</p>
-      <p>As a result of these factors, a price adjustment will be applied to your account effective <b>${startDateStr}</b>. You can expect to see the specific changes reflected in your upcoming billing cycle.</p>
-      <p>The increase will be defined as the structure below:</p>
-      <table style="width:100%; border-collapse: collapse; margin-top: 15px; text-align: left; font-size: 13px;">
-          <thead><tr><th style="padding:8px; border-bottom:2px solid #006272; color:#006272;">Product</th><th style="padding:8px; border-bottom:2px solid #006272; color:#006272;">Current Price</th><th style="padding:8px; border-bottom:2px solid #006272; color:#006272;">New Price</th><th style="padding:8px; border-bottom:2px solid #006272; color:#006272;">% Increase</th></tr></thead>
-          <tbody>${itemsHtml}</tbody>
-      </table>
-      <p style="margin-top: 40px;">Sincerely,</p>
-      <p><b>Air Liquide Canada</b></p>
-    </div>`;
-
-    const blob = HtmlService.createHtmlOutput(html).getAs('application/pdf');
-    const base64 = Utilities.base64Encode(blob.getBytes());
-    return { filename: `${customerName.replace(/[^a-zA-Z0-9]/g, '_')}_Price_Increase.pdf`, base64: base64 };
-  } catch (error) { throw new Error(error.toString()); }
-}
-
 function onOpen() { SpreadsheetApp.getUi().createMenu('ALC Pricing Tools').addItem('Generate "To be loaded" Tab', 'generateUploadTab').addToUi(); }
 
 function getAppLogo() {
@@ -525,7 +457,7 @@ function generateUploadTab() {
       
       for (let i = 1; i < data.length; i++) {
         const row = data[i];
-        if (row.length > 33 && row[33] === "APPROVED") { 
+        if (row.length > 33 && (row[33] === "APPROVED" || row[33] === "MODIFIED")) { 
           let newRow = new Array(20).fill("");
           newRow[2] = "Item Number"; 
           const storedDate = (row.length > 32) ? row[32] : ""; let finalDate = "26-Feb-2026"; 
