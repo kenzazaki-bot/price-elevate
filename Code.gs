@@ -5,8 +5,11 @@
 
 const COLORS = { PRIMARY: "#006272", ACCENT: "#ff8200", SECONDARY: "#4ec3e0", NEUTRAL: "#d0d0ce", NEGATIVE: "#a73321", POSITIVE: "#58b947", WHITE: "#ffffff" };
 
-function doGet() {
-  return HtmlService.createTemplateFromFile('WebApp')
+function doGet(e) {
+  const page = (e.parameter && e.parameter.page) ? e.parameter.page.toLowerCase() : 'user';
+  let template = HtmlService.createTemplateFromFile('WebApp');
+  template.pageContext = page;
+  return template
     .evaluate()
     .setTitle('Bulk Pack Review - Eastern Region')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
