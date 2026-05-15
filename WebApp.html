@@ -38,7 +38,7 @@
     table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; table-layout: fixed; }
     thead { background: var(--primary); color: white; }
     th { padding: 10px; text-align: left; font-size: 0.8rem; text-transform: uppercase; vertical-align: top; }
-    td { padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 0.85rem; vertical-align: top; overflow-wrap: break-word; }
+    td { padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 0.85rem; vertical-align: middle; overflow-wrap: break-word; }
     .filter-input { width: 90%; padding: 4px; margin-top: 5px; font-size: 0.75rem; border: 1px solid #ccc; border-radius: 3px; }
     .date-input { width: 95%; padding: 4px; font-size: 0.8rem; border: 1px solid #ccc; border-radius: 3px; font-family: 'Roboto Mono', monospace; }
     .col-price { text-align: right; font-family: 'Roboto Mono', monospace; font-weight: bold; }
@@ -72,9 +72,6 @@
     .btn-submit-pf { background: var(--neg); color: white; padding: 5px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold; margin-left:10px; }
     .loader-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 3000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
     .loader-spinner { border: 5px solid #f3f3f3; border-top: 5px solid var(--primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 15px; }
-    .progress-container { width: 100%; background: #eee; border-radius: 4px; overflow: hidden; display: flex; height: 12px; margin-top: 5px; }
-    .progress-app { background: var(--pos); height: 100%; }
-    .progress-rej { background: var(--neg); height: 100%; }
     .admin-rule-builder { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
     .admin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 15px; }
     .admin-field { display: flex; flex-direction: column; text-align: left; }
@@ -121,7 +118,6 @@
 
     <div class="admin-rule-builder">
       <h3 style="margin-top:0; color: #333;">Step 1: Raw Data Ingestion & Mapping</h3>
-      <p style="font-size: 0.9rem; color: #666;">Paste the Google Drive Folder ID containing your raw ERP CSV exports to fetch headers and map columns.</p>
       <div style="display:flex; gap: 10px; align-items:center;">
         <input type="text" id="drive-folder-id" class="dropdown-input" placeholder="Drive Folder ID..." style="flex:1;">
         <button class="btn-main" style="width:150px;" id="btn-fetch-csv" onclick="fetchCsvHeaders()">Fetch Headers</button>
@@ -134,7 +130,6 @@
 
     <div class="admin-rule-builder">
       <h3 style="margin-top:0; color: #333;">Step 2: Map User Hierarchy</h3>
-      <p style="font-size: 0.9rem; color: #666;">Paste the Google Sheet ID and Tab name to dynamically link AEs to their Managers/Regions.</p>
       <div style="display:flex; gap: 10px; align-items:center;">
         <input type="text" id="hier-sheet-id" class="dropdown-input" placeholder="Google Sheet ID..." style="flex:2;">
         <input type="text" id="hier-tab-name" class="dropdown-input" placeholder="Tab Name..." style="flex:1;">
@@ -148,9 +143,7 @@
 
     <div class="admin-rule-builder">
       <h3 style="margin-top:0; color: #333;">Step 3: Define Target Group & Increase</h3>
-      <p style="font-size: 0.9rem; color: #666;">Scan your mapped CSV files to extract the exact Segment categories for your rules.</p>
       <button class="btn-main" style="width:auto; padding: 8px 20px;" id="btn-load-segments" onclick="loadSegmentsFromCSV()">Load Segments from Mapped CSVs</button>
-      
       <div id="rules-grid-container" style="display:none; margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
         <div class="admin-grid">
           <div class="admin-field"><label>Segment 1</label><select id="admin-seg1"><option value="ALL">-- ALL --</option></select></div>
@@ -177,11 +170,10 @@
 
     <div class="admin-rule-builder" style="text-align:center; background: #e8f5e9; border: 1px solid #c8e6c9;">
       <h3 style="margin-top:0; color: #2e7d32;">Step 4: Execute ETL Pipeline</h3>
-      <p style="font-size: 0.9rem; color: #555; margin-bottom: 20px;">This will parse all CSVs, join the user hierarchy, run the campaign math to override Suggested Price and Est Impact, and distribute the lines into unique Segment 2 files.</p>
+      <p style="font-size: 0.9rem; color: #555; margin-bottom: 20px;">This will parse all CSVs, join the user hierarchy, run the campaign math, and generate a Hub and Spoke directory mapping.</p>
       <button class="btn-main" style="background:var(--pos); width:250px; font-size:1.1rem;" id="btn-exec-pipeline" onclick="executeFullPipeline()">EXECUTE PIPELINE</button>
       <div id="pipeline-results" style="margin-top:15px; text-align:left; font-size:0.9rem;"></div>
     </div>
-
   </div>
 
   <div id="dashboard-view">
@@ -192,8 +184,8 @@
         <label><b>View:</b></label>
         <select id="status-filter" class="main-filter" onchange="triggerFilter()"><option value="ALL">Show All</option><option value="PENDING" selected>Pending</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option></select>
         <button class="btn-cancel" style="padding: 5px 15px; font-size: 0.8rem;" onclick="clearAllFilters()">Clear All Filters</button>
-        <button class="btn-export" onclick="exportToExcel()">Export</button>
-        <button class="btn-export" style="background:var(--primary);" onclick="openPdfModal()">Letters</button>
+        <button class="btn-export" onclick="exportToExcel()">Export Data</button>
+        <button class="btn-export" style="background:var(--primary); display:none;" onclick="openPdfModal()">PDF Letters</button>
         <button id="btn-submit-portfolio" class="btn-submit-pf" onclick="submitPortfolioAE()">Submit Portfolio</button>
         <span id="portfolio-status-badge" class="status-badge badge-frozen" style="display:none;"></span>
       </div>
@@ -202,10 +194,10 @@
     <div id="table-container"></div>
   </div>
 
-  <div id="modify-modal" class="modal-overlay"><div class="modal-box"><h3>Modify Price</h3><input type="number" id="modal-price" class="modal-input" step="0.01"><input type="text" id="modify-comment" class="modal-input"><div class="modal-actions"><button class="btn-cancel" onclick="closeModals()">Cancel</button><button class="btn-confirm" onclick="confirmModify()">Save</button></div></div></div>
-  <div id="comment-modal" class="modal-overlay"><div class="modal-box"><h3>Reason Required</h3><textarea id="modal-comment" class="modal-textarea"></textarea><div class="modal-actions"><button class="btn-cancel" onclick="closeModals()">Cancel</button><button class="btn-confirm" onclick="confirmRejection()">Submit</button></div></div></div>
+  <div id="modify-modal" class="modal-overlay"><div class="modal-box"><h3>Modify Price</h3><input type="number" id="modal-price" class="modal-input" step="0.01"><input type="text" id="modify-comment" class="modal-input" placeholder="Reason (Optional)"><div class="modal-actions"><button class="btn-cancel" onclick="closeModals()">Cancel</button><button class="btn-confirm" onclick="confirmModify()">Save</button></div></div></div>
+  <div id="comment-modal" class="modal-overlay"><div class="modal-box"><h3>Reason Required</h3><textarea id="modal-comment" class="modal-textarea" placeholder="Enter reason..."></textarea><div class="modal-actions"><button class="btn-cancel" onclick="closeModals()">Cancel</button><button class="btn-confirm" onclick="confirmRejection()">Submit</button></div></div></div>
   <div id="impact-modal" class="modal-overlay"><div class="modal-box"><h3>Impacted Accounts</h3><div id="impact-list" class="modal-list-container"></div><div class="modal-actions"><button class="btn-confirm" onclick="closeImpactModal()">Close</button></div></div></div>
-  <div id="pdf-modal" class="modal-overlay"><div class="modal-box"><h3>Generate Letter</h3><select id="pdf-customer-select" class="modal-input"></select><div class="modal-actions"><button class="btn-cancel" onclick="closePdfModal()">Cancel</button><button class="btn-confirm" id="btn-generate-pdf" onclick="generatePDF()">Download</button></div></div></div>
+  <div id="pdf-modal" class="modal-overlay"><div class="modal-box"><h3>Generate Letter</h3><select id="pdf-customer-select" class="modal-input"></select><div class="modal-actions"><button class="btn-cancel" onclick="closePdfModal()">Cancel</button><button class="btn-confirm" id="btn-generate-pdf" onclick="generatePDFFrontend()">Download</button></div></div></div>
 
   <script>
     let ROW_DATA = []; let PORTFOLIO_STATUS = "Not Submitted"; let USER_CACHE = { AE: [], SC: [] }; let CURRENT_LIST = []; 
@@ -215,7 +207,7 @@
       { id: 'map_pl', label: 'Price List' }, { id: 'map_item', label: 'Item Number' }, { id: 'map_desc', label: 'Description' },
       { id: 'map_price', label: 'Current Price' }, { id: 'map_vol', label: 'Volume (Qty)' }, { id: 'map_acct_num', label: 'Account Number' },
       { id: 'map_acct_name', label: 'Account Name' }, { id: 'map_ae', label: 'AE Name (Join Key)' }, { id: 'map_sc', label: 'SC Name (Fallback)' },
-      { id: 'map_class', label: 'Class Code' }, { id: 'map_seg1', label: 'Segment 1' }, { id: 'map_seg2', label: 'Segment 2 (Split Key)' },
+      { id: 'map_class', label: 'Class Code' }, { id: 'map_seg1', label: 'Segment 1' }, { id: 'map_seg2', label: 'Segment 2' },
       { id: 'map_seg3', label: 'Segment 3' }, { id: 'map_seg4', label: 'Segment 4' }, { id: 'map_seg5', label: 'Segment 5' }
     ];
 
@@ -265,8 +257,37 @@
       } else {
         const user = document.getElementById('user-input').value; if(!user) return alert("Select user.");
         document.getElementById('dashboard-view').style.display = 'block'; document.getElementById('current-user').innerText = `${role}: ${user}`;
-        document.getElementById('table-container').innerHTML = '<div class="loading">Fetching...</div>';
-        google.script.run.withSuccessHandler(r => { ROW_DATA = r.items; PORTFOLIO_STATUS = r.portfolioStatus; renderTable(); }).getItemsForUser(user, role);
+        
+        // Setup table skeleton ensuring headers remain static so filters don't lose focus
+        document.getElementById('table-container').innerHTML = `
+          <table id="main-data-table">
+            <thead>
+              <tr>
+                <th width="3%" class="chk-cell"><input type="checkbox" id="master-chk" onclick="toggleAll(this)"></th>
+                <th width="10%">Price List <br><input type="text" class="filter-input" data-col="priceList" onkeyup="triggerFilter()"></th>
+                <th width="7%">Item # <br><input type="text" class="filter-input" data-col="itemNum" onkeyup="triggerFilter()"></th>
+                <th width="15%">Description <br><input type="text" class="filter-input" data-col="desc" onkeyup="triggerFilter()"></th>
+                <th width="7%">Acct Exec <br><input type="text" class="filter-input" data-col="salesPerson" onkeyup="triggerFilter()"></th>
+                <th width="5%">L12M Qty</th>
+                <th width="9%">Start Date</th>
+                <th width="6%" class="col-price">Curr Price <br><input type="text" class="filter-input" data-col="currPrice" placeholder=">50" onkeyup="triggerFilter()"></th>
+                <th width="6%" class="col-price">Sugg Price</th>
+                <th width="5%" class="col-price">Sugg %</th>
+                <th width="6%" class="col-price">Est Imp</th>
+                <th width="6%" class="col-price">Final $</th>
+                <th width="5%" class="col-price">Mod %</th>
+                <th width="6%">Status</th>
+                <th width="8%">Comments</th>
+                <th width="8%">Action</th>
+              </tr>
+            </thead>
+            <tbody id="table-body">
+              <tr><td colspan="16" style="text-align:center; padding:20px; color:#00505c; font-weight:bold;">Fetching Data from Secure Shard...</td></tr>
+            </tbody>
+          </table>
+        `;
+
+        google.script.run.withSuccessHandler(r => { ROW_DATA = r.items; PORTFOLIO_STATUS = r.portfolioStatus; renderTable(); }).withFailureHandler(err => { alert(err.message); goBack(); }).getItemsForUser(user, role);
       }
     }
 
@@ -300,24 +321,12 @@
       }).withFailureHandler(err => { btn.innerText = "Fetch Headers"; btn.disabled = false; alert(err.message); }).getHeadersFromHierarchySheet(sId, tName);
     }
 
-    // --- ADMIN CAMPAIGN RULES ---
     function loadSegmentsFromCSV() {
       const payload = { csvFolderId: document.getElementById('drive-folder-id').value, csvMap: {} };
-      
-      let isMapped = true;
-      REQUIRED_MAPPING_FIELDS.forEach(f => {
-         let val = document.getElementById(f.id) ? document.getElementById(f.id).value : "";
-         payload.csvMap[f.id] = val;
-      });
+      REQUIRED_MAPPING_FIELDS.forEach(f => { payload.csvMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : ""; });
+      if(!payload.csvFolderId || document.getElementById('map-grid-items').innerHTML === "") { return alert("Please complete Step 1 (CSV Ingestion & Mapping) first."); }
 
-      if(!payload.csvFolderId || document.getElementById('map-grid-items').innerHTML === "") {
-        return alert("Please complete Step 1 (CSV Ingestion & Mapping) first.");
-      }
-
-      const btn = document.getElementById('btn-load-segments');
-      btn.innerText = "Scanning CSVs... (This may take a minute)";
-      btn.disabled = true;
-
+      const btn = document.getElementById('btn-load-segments'); btn.innerText = "Scanning CSVs..."; btn.disabled = true;
       google.script.run.withSuccessHandler(dims => {
         btn.innerText = "Segments Loaded!";
         if (!dims) return;
@@ -326,18 +335,12 @@
           document.getElementById(id).innerHTML = `<option value="ALL">-- ALL --</option>` + dims[key].map(v => `<option value="${v}">${v}</option>`).join('');
         });
         document.getElementById('rules-grid-container').style.display = 'block';
-      }).withFailureHandler(err => {
-        btn.innerText = "Load Segments from Mapped CSVs"; btn.disabled = false; alert(err.message);
-      }).getCampaignDimensionsFromCSV(payload);
+      }).withFailureHandler(err => { btn.innerText = "Load Segments from Mapped CSVs"; btn.disabled = false; alert(err.message); }).getCampaignDimensionsFromCSV(payload);
     }
 
     function addCampaignRule() {
       const pct = parseFloat(document.getElementById('admin-pct').value); if(isNaN(pct)) return alert("Valid % required.");
-      CAMPAIGN_RULES.push({
-        seg1: document.getElementById('admin-seg1').value, seg2: document.getElementById('admin-seg2').value,
-        seg3: document.getElementById('admin-seg3').value, seg4: document.getElementById('admin-seg4').value,
-        seg5: document.getElementById('admin-seg5').value, classCode: document.getElementById('admin-class').value, pct: pct
-      });
+      CAMPAIGN_RULES.push({ seg1: document.getElementById('admin-seg1').value, seg2: document.getElementById('admin-seg2').value, seg3: document.getElementById('admin-seg3').value, seg4: document.getElementById('admin-seg4').value, seg5: document.getElementById('admin-seg5').value, classCode: document.getElementById('admin-class').value, pct: pct });
       renderAdminRules();
     }
     
@@ -349,61 +352,199 @@
       tb.innerHTML = CAMPAIGN_RULES.map((r, i) => `<tr><td>${r.seg1}</td><td>${r.seg2}</td><td>${r.seg3}</td><td>${r.seg4}</td><td>${r.seg5}</td><td>${r.classCode}</td><td class="sugg-price">+${r.pct}%</td><td><button class="btn-remove-rule" onclick="removeAdminRule(${i})">Remove</button></td></tr>`).join('');
     }
 
-    // --- ADMIN ETL EXECUTION ---
     function executeFullPipeline() {
-      if(!confirm("Are you sure? This will run the campaign math and override raw data into new shard files.")) return;
-      
-      const payload = {
-        csvFolderId: document.getElementById('drive-folder-id').value, csvMap: {},
-        hierSheetId: document.getElementById('hier-sheet-id').value, hierTab: document.getElementById('hier-tab-name').value, hierMap: {},
-        campaignRules: CAMPAIGN_RULES
-      };
+      if(!confirm("Are you sure? This will execute the Campaign ETL and write new Shard files per AE to Drive.")) return;
+      const payload = { csvFolderId: document.getElementById('drive-folder-id').value, csvMap: {}, hierSheetId: document.getElementById('hier-sheet-id').value, hierTab: document.getElementById('hier-tab-name').value, hierMap: {}, campaignRules: CAMPAIGN_RULES };
 
       REQUIRED_MAPPING_FIELDS.forEach(f => payload.csvMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : "");
-      if(payload.csvMap.map_ae === "" || payload.csvMap.map_seg2 === "") return alert("CSV Map: 'AE Name' and 'Segment 2' are mandatory.");
+      if(payload.csvMap.map_ae === "") return alert("CSV Map: 'AE Name' is mandatory for Hub and Spoke routing.");
 
       HIERARCHY_MAPPING_FIELDS.forEach(f => payload.hierMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : "");
       if(payload.hierMap.hmap_ae === "") return alert("Hierarchy Map: 'AE Name' is mandatory to join data.");
 
       const btn = document.getElementById('btn-exec-pipeline'); const resDiv = document.getElementById('pipeline-results');
-      btn.innerText = "PROCESSING PIPELINE... (DO NOT CLOSE)"; btn.disabled = true; resDiv.innerHTML = "Working... This may take a few minutes.";
+      btn.innerText = "PROCESSING PIPELINE... (DO NOT CLOSE)"; btn.disabled = true; resDiv.innerHTML = "Working... This may take several minutes depending on volume.";
 
       google.script.run.withSuccessHandler(r => {
         btn.innerText = "EXECUTE PIPELINE"; btn.disabled = false;
-        let h = `<strong style="color:var(--pos)">SUCCESS! Processed ${r.processed} Rows.</strong><br><a href="${r.folderUrl}" target="_blank">Open Master Output Folder</a><br><br>`;
-        r.files.forEach(f => h += `• ${f.key} (${f.count} rows) - <a href="${f.url}" target="_blank">File</a><br>`);
+        let h = `<strong style="color:var(--pos)">SUCCESS! Processed ${r.processed} Rows into Hub & Spoke Shards.</strong><br><a href="${r.folderUrl}" target="_blank">Open Master Output Folder</a><br><br>`;
+        r.files.forEach(f => h += `• ${f.key} (${f.count} rows) - <a href="${f.url}" target="_blank">View File</a><br>`);
         resDiv.innerHTML = h;
-      }).withFailureHandler(e => {
-        btn.innerText = "EXECUTE PIPELINE"; btn.disabled = false; resDiv.innerHTML = `<span style="color:red">Error: ${e.message}</span>`;
-      }).runETLPipeline(payload);
+      }).withFailureHandler(e => { btn.innerText = "EXECUTE PIPELINE"; btn.disabled = false; resDiv.innerHTML = `<span style="color:red">Error: ${e.message}</span>`; }).runETLPipeline(payload);
     }
 
-    // --- ... (KEEP ALL EXISTING DASHBOARD/MANAGER/PDF FUNCTIONS EXACTLY AS THEY WERE) ... ---
-    function renderManagerTable(data) { /* Legacy intact */ }
-    function mgrApprovePortfolio(aeName) { /* Legacy intact */ }
-    function submitPortfolioAE() { /* Legacy intact */ }
-    function exportToExcel() { /* Legacy intact */ }
-    function openPdfModal() { /* Legacy intact */ }
-    function closePdfModal() { /* Legacy intact */ }
-    function generatePDF() { /* Legacy intact */ }
-    function formatDateForInput(dateStr) { /* Legacy intact */ return "2026-02-25"; }
-    function renderTable() { /* Legacy intact */ }
-    function updateDate(i, v) { /* Legacy intact */ }
-    function updateTotals() { /* Legacy intact */ }
-    function approveLine(i) { /* Legacy intact */ }
-    function openModifyModal(i) { /* Legacy intact */ }
-    function confirmModify() { /* Legacy intact */ }
-    function openCommentModal(t, i) { /* Legacy intact */ }
-    function confirmRejection() { /* Legacy intact */ }
-    function closeModals() { /* Legacy intact */ }
-    function bulkDecide(d, c="") { /* Legacy intact */ }
-    function decide(i, d, c="", p=null, dt="") { /* Legacy intact */ }
-    function openImpactModal(i) { /* Legacy intact */ }
-    function closeImpactModal() { /* Legacy intact */ }
-    function toggleAll(m) { /* Legacy intact */ }
-    function updateBulkBar() { /* Legacy intact */ }
-    function triggerFilter() { /* Legacy intact */ }
-    function clearAllFilters() { /* Legacy intact */ }
+    // --- DASHBOARD LOGIC ---
+    function formatDateForInput(dateStr) { if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr; return "2026-02-25"; }
+
+    function renderTable() {
+      const body = document.getElementById('table-body');
+      const statusView = document.getElementById('status-filter').value;
+      const activeFilters = {}; 
+      document.querySelectorAll('.filter-input').forEach(input => { if (input.value && input.dataset.col) activeFilters[input.dataset.col] = input.value.toLowerCase().trim(); });
+
+      const visibleItems = ROW_DATA.filter(row => {
+          const status = row.status || "PENDING"; if (statusView !== 'ALL' && status !== statusView) return false;
+          for (let col in activeFilters) {
+            let filterVal = activeFilters[col]; let cellVal = row[col];
+            if (col === 'currPrice') {
+              const numVal = parseFloat(cellVal); const filterNum = parseFloat(filterVal.replace(/[<>=]/g, ''));
+              if (filterVal.startsWith('>=') && numVal < filterNum) return false;
+              else if (filterVal.startsWith('<=') && numVal > filterNum) return false;
+              else if (filterVal.startsWith('>') && numVal <= filterNum) return false;
+              else if (filterVal.startsWith('<') && numVal >= filterNum) return false;
+              else if (!filterVal.match(/[<>=]/) && !numVal.toString().includes(filterVal)) return false;
+            } else { let textVal = (cellVal || "").toString().toLowerCase(); if (!textVal.includes(filterVal)) return false; }
+          } return true;
+      });
+
+      if(visibleItems.length === 0) { body.innerHTML = "<tr><td colspan='16' style='text-align:center; padding:20px; font-weight:bold; color:#a73321;'>✅ No Items Found matching filters</td></tr>"; document.getElementById('stats').innerText = "Showing 0 items"; return; }
+      updateTotals();
+
+      let html = visibleItems.map((row) => {
+        const index = ROW_DATA.indexOf(row);
+        const status = row.status || "PENDING"; const badgeClass = status === "APPROVED" ? "badge-approved" : (status === "REJECTED" ? "badge-rejected" : "badge-pending");
+        let volDisplay = row.volDisplay || row.qty.toFixed(0); 
+        let finalDisplay = (row.finalPrice !== "" && row.finalPrice !== 0 && row.finalPrice !== null) ? parseFloat(row.finalPrice).toFixed(2) : "";
+        let dateVal = formatDateForInput(row.startDate);
+
+        let suggPct = row.currPrice > 0 ? (((row.suggPrice - row.currPrice) / row.currPrice) * 100).toFixed(1) : 0;
+        let finalPct = row.currPrice > 0 && row.finalPrice ? (((row.finalPrice - row.currPrice) / row.currPrice) * 100).toFixed(1) : "";
+        let modPctVal = finalPct !== "" ? finalPct : suggPct;
+
+        return `<tr id="tr-${index}" class="data-row">
+            <td class="chk-cell"><input type="checkbox" class="row-chk" value="${index}" onchange="updateBulkBar()"></td>
+            <td><div style="font-weight:bold; color:#00505c">${row.priceList}</div></td>
+            <td style="font-weight:bold;">${row.itemNum}</td>
+            <td>${row.desc}</td>
+            <td>${row.salesPerson || ""}</td>
+            <td style="font-weight:bold; color:#555">${volDisplay}</td>
+            <td><input type="date" class="date-input" value="${dateVal}" onchange="updateDate(${index}, this.value)"></td>
+            <td class="col-price">$${row.currPrice.toFixed(2)}</td>
+            <td class="col-price sugg-price">$${row.suggPrice.toFixed(2)}</td>
+            <td class="col-price sugg-price">${suggPct}%</td>
+            <td class="col-price impact-val">$${row.estImpact.toFixed(2)}</td>
+            <td class="col-price col-final">${finalDisplay ? '$'+finalDisplay : ''}</td>
+            <td class="col-price"><input type="number" step="0.1" value="${modPctVal}" style="width:60px; font-family:'Roboto Mono', monospace; border:1px solid #ccc; border-radius:3px; padding:4px;" onchange="updatePctInline(${index}, this.value)"></td>
+            <td><span id="badge-${index}" class="status-badge ${badgeClass}">${status}</span></td>
+            <td id="comment-${index}" style="font-size:0.75rem; color:#555; font-style:italic;">${row.comment || ""}</td>
+            <td>
+                <button class="btn btn-app" onclick="approveLine(${index})">✔</button>
+                <button class="btn btn-mod" onclick="openModifyModal(${index})">✎</button>
+                <button class="btn btn-rej" onclick="openCommentModal('SINGLE', ${index})">✘</button>
+            </td>
+        </tr>`;
+      }).join('');
+
+      body.innerHTML = html;
+      document.getElementById('stats').innerText = `Showing ${visibleItems.length} items`;
+    }
+
+    function updatePctInline(index, pctStr) {
+      let item = ROW_DATA[index];
+      let pct = parseFloat(pctStr);
+      if (isNaN(pct)) return;
+      
+      let newPrice = item.currPrice * (1 + (pct / 100));
+      item.finalPrice = newPrice;
+      
+      // Auto-Approve on inline modification to trigger network save directly.
+      decide(index, 'APPROVED', item.comment, newPrice, item.startDate);
+    }
+
+    function updateDate(index, val) { ROW_DATA[index].startDate = val; }
+
+    function updateTotals() {
+      let totalEst = 0; let totalReal = 0;
+      ROW_DATA.forEach(row => {
+        if (row.estImpact) totalEst += row.estImpact;
+        if (row.status === "APPROVED" && row.finalPrice && row.qty > 0) {
+           let groupRealized = (row.finalPrice - row.currPrice) * row.qty;
+           if (row.rowIds && row.rowIds.length > 0) { totalReal += (groupRealized / row.rowIds.length); }
+        }
+      });
+      document.getElementById('total-est').innerText = "$" + totalEst.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+      document.getElementById('total-real').innerText = "$" + totalReal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+
+    function approveLine(index) { const item = ROW_DATA[index]; if (!item.startDate) item.startDate = "2026-02-25"; item.finalPrice = item.suggPrice; decide(index, 'APPROVED', item.comment, null, item.startDate); }
+    function openModifyModal(index) { PENDING_EDIT_IDX = index; const item = ROW_DATA[index]; document.getElementById('modal-price').value = item.finalPrice || item.suggPrice; document.getElementById('modify-comment').value = item.comment || ""; document.getElementById('modify-modal').style.display = 'block'; }
+    function confirmModify() { const price = parseFloat(document.getElementById('modal-price').value); const comment = document.getElementById('modify-comment').value; if (isNaN(price)) return alert("Invalid Price"); const date = ROW_DATA[PENDING_EDIT_IDX].startDate || "2026-02-25"; ROW_DATA[PENDING_EDIT_IDX].finalPrice = price; decide(PENDING_EDIT_IDX, 'APPROVED', comment, price, date); closeModals(); }
+    function openCommentModal(type, index) { pendingAction = { type: type, index: index }; document.getElementById('modal-comment').value = ""; document.getElementById('comment-modal').style.display = 'block'; }
+    function confirmRejection() { const reason = document.getElementById('modal-comment').value.trim(); if (!reason) return alert("Comment is required."); if (pendingAction.type === 'SINGLE') { ROW_DATA[pendingAction.index].finalPrice = ""; decide(pendingAction.index, 'REJECTED', reason); } else { bulkDecide('REJECTED', reason); } closeModals(); }
+    function closeModals() { document.getElementById('comment-modal').style.display = 'none'; document.getElementById('modify-modal').style.display = 'none'; pendingAction = null; PENDING_EDIT_IDX = null; }
+
+    function bulkDecide(decision, comment="") {
+      const selected = document.querySelectorAll('.row-chk:checked'); if (selected.length === 0) return;
+      const indicesToUpdate = [];
+      selected.forEach(chk => {
+        const idx = parseInt(chk.value); indicesToUpdate.push(idx); const item = ROW_DATA[idx];
+        if (decision === 'APPROVED') item.finalPrice = item.suggPrice; else item.finalPrice = "";
+        item.status = decision; if(comment) item.comment = comment; if(!item.startDate) item.startDate = "2026-02-25";
+      });
+      renderTable(); document.getElementById('master-chk').checked = false; document.getElementById('bulk-bar').style.display = 'none';
+      const bulkPayload = indicesToUpdate.map(idx => ({ rowIds: ROW_DATA[idx].rowIds, decision: decision, finalPrice: ROW_DATA[idx].finalPrice, comment: ROW_DATA[idx].comment, startDate: ROW_DATA[idx].startDate }));
+      google.script.run.submitReview(bulkPayload, document.getElementById('user-input').value);
+    }
+
+    function decide(index, decision, comment="", price=null, date="") {
+      const item = ROW_DATA[index]; item.status = decision; if (comment) item.comment = comment; if (price !== null) item.finalPrice = price; if (date) item.startDate = date; 
+      renderTable();
+      const payload = [{ rowIds: item.rowIds, decision: decision, finalPrice: item.finalPrice, comment: item.comment, startDate: item.startDate }];
+      google.script.run.submitReview(payload, document.getElementById('user-input').value);
+    }
+
+    function openImpactModal(index) { const list = ROW_DATA[index].impacts; const container = document.getElementById('impact-list'); container.innerHTML = list.length === 0 ? "<div style='color:#666;'>No impacted accounts found.</div>" : list.map(i => `<div class="modal-list-item">${i}</div>`).join(''); document.getElementById('impact-modal').style.display = 'block'; }
+    function closeImpactModal() { document.getElementById('impact-modal').style.display = 'none'; }
+    function toggleAll(master) { document.querySelectorAll('.row-chk').forEach(chk => chk.checked = master.checked); updateBulkBar(); }
+    function updateBulkBar() { const count = document.querySelectorAll('.row-chk:checked').length; document.getElementById('bulk-bar').style.display = count > 0 ? 'flex' : 'none'; document.getElementById('selected-count').innerText = count; }
+    function triggerFilter() { clearTimeout(debounceTimer); debounceTimer = setTimeout(renderTable, 400); }
+    function clearAllFilters() { document.querySelectorAll('.filter-input').forEach(input => input.value = ""); document.getElementById('status-filter').value = "PENDING"; renderTable(); }
+
+    function renderManagerTable(data) {
+       let html = `<table><thead><tr><th>AE Name</th><th>Total Items</th><th>Pending</th><th>Approved</th><th>Est Impact</th><th>Realized Impact</th><th>Status</th></tr></thead><tbody>`;
+       data.forEach(row => {
+           let badgeColor = row.portfolioStatus === "Approved" ? "badge-approved" : (row.portfolioStatus === "Pending Approval" ? "badge-frozen" : "badge-pending");
+           html += `<tr><td><b>${row.aeName}</b></td><td>${row.total}</td><td>${row.pending}</td><td>${row.approved}</td><td class="val-est">$${row.estImpact.toFixed(2)}</td><td class="val-real">$${row.realized.toFixed(2)}</td><td><span class="status-badge ${badgeColor}">${row.portfolioStatus}</span></td></tr>`;
+       });
+       html += `</tbody></table>`;
+       document.getElementById('manager-table-container').innerHTML = html;
+    }
+
+    function submitPortfolioAE() {
+       if(!confirm("Are you sure you want to submit your portfolio for Manager review?")) return;
+       const user = document.getElementById('user-input').value;
+       google.script.run.withSuccessHandler(()=>{ alert("Portfolio Submitted!"); start(); }).submitPortfolio(user);
+    }
+
+    function exportToExcel() {
+       let csvContent = "data:text/csv;charset=utf-8,Price List,Item Num,Description,AE Name,Est Impact,Qty,Current Price,Suggested Price,Final Price,Status,Comment\n";
+       ROW_DATA.forEach(row => {
+           let rArray = [ `"${row.priceList}"`, `"${row.itemNum}"`, `"${row.desc}"`, `"${row.salesPerson}"`, row.estImpact, row.qty, row.currPrice, row.suggPrice, row.finalPrice || "", row.status, `"${row.comment}"`];
+           csvContent += rArray.join(",") + "\n";
+       });
+       const encodedUri = encodeURI(csvContent); const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", "BulkPack_Export.csv"); document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
+
+    function openPdfModal() {
+       const user = document.getElementById('user-input').value; const role = document.querySelector('input[name="role"]:checked').value;
+       document.getElementById('pdf-customer-select').innerHTML = '<option>Loading...</option>'; document.getElementById('pdf-modal').style.display = 'block';
+       google.script.run.withSuccessHandler(accts => {
+         let html = accts.length === 0 ? '<option value="">No Approved Accounts Found</option>' : accts.map(a => `<option value="${a.num}">${a.num} - ${a.name}</option>`).join('');
+         document.getElementById('pdf-customer-select').innerHTML = html;
+       }).getApprovedAccounts(user, role);
+    }
+    
+    function closePdfModal() { document.getElementById('pdf-modal').style.display = 'none'; }
+    
+    function generatePDFFrontend() {
+       const user = document.getElementById('user-input').value; const role = document.querySelector('input[name="role"]:checked').value; const acct = document.getElementById('pdf-customer-select').value;
+       if (!acct) return alert("Select an account.");
+       const btn = document.getElementById('btn-generate-pdf'); btn.innerText = "Generating..."; btn.disabled = true;
+       google.script.run.withSuccessHandler(res => {
+         btn.innerText = "Download"; btn.disabled = false; closePdfModal();
+         const link = document.createElement('a'); link.href = `data:application/pdf;base64,${res.base64}`; link.download = res.filename; link.click();
+       }).withFailureHandler(err => { btn.innerText = "Download"; btn.disabled = false; alert(err.message); }).generatePDF(user, role, acct);
+    }
   </script>
 </body>
 </html>
