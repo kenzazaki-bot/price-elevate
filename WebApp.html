@@ -24,37 +24,40 @@
     .dropdown-item:hover { background: #f1f1f1; }
     .btn-main { background: var(--primary); color: white; width: 100%; padding: 12px; font-size: 1rem; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
     #dashboard-view, #manager-view, #admin-view { max-width: 98%; margin: 20px auto; padding: 0 10px; display: none; }
-    .summary-bar { display: flex; gap: 20px; margin-bottom: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); justify-content: flex-end; }
+    
+    .how-to-text { background: #e3f2fd; padding: 15px; border-radius: 5px; font-size: 0.9rem; color: #00505c; border-left: 5px solid var(--secondary); max-width: 600px; }
+    .summary-bar { display: flex; gap: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); justify-content: flex-end; }
     .summary-card { text-align: right; }
     .summary-label { font-size: 0.8rem; color: #666; font-weight: bold; text-transform: uppercase; }
     .summary-value { font-size: 1.4rem; font-weight: bold; font-family: 'Roboto Mono', monospace; }
     .val-est { color: var(--accent); }
     .val-real { color: var(--pos); }
+    
     .bulk-bar { background: #e3f2fd; border: 1px solid #90caf9; padding: 10px; margin-bottom: 15px; display: none; align-items: center; justify-content: space-between; border-radius: 5px; }
     .bulk-btns button { margin-left: 10px; }
     .btn-bulk { padding: 8px 16px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; color: white; }
     .controls { display: flex; justify-content: space-between; margin-bottom: 15px; }
     select.main-filter { padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
+    
     table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; table-layout: fixed; }
     thead { background: var(--primary); color: white; }
-    th { padding: 10px; text-align: left; font-size: 0.8rem; text-transform: uppercase; vertical-align: top; }
+    th { padding: 10px; text-align: left; font-size: 0.75rem; text-transform: uppercase; vertical-align: top; }
     td { padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 0.85rem; vertical-align: middle; overflow-wrap: break-word; }
     .filter-input { width: 90%; padding: 4px; margin-top: 5px; font-size: 0.75rem; border: 1px solid #ccc; border-radius: 3px; }
-    .date-input { width: 95%; padding: 4px; font-size: 0.8rem; border: 1px solid #ccc; border-radius: 3px; font-family: 'Roboto Mono', monospace; }
+    
+    .input-editable { background-color: #e1f5fe; border: 1px solid #0288d1; border-radius: 3px; padding: 4px; font-family: 'Roboto', sans-serif; width: 100%; box-sizing: border-box; }
+    .input-editable:focus { outline: 2px solid var(--accent); background-color: white; }
+    
     .col-price { text-align: right; font-family: 'Roboto Mono', monospace; font-weight: bold; }
-    .col-final { text-align: right; font-family: 'Roboto Mono', monospace; font-weight: bold; color: blue; }
     .sugg-price { color: var(--accent); }
     .status-badge { padding: 3px 6px; border-radius: 3px; font-size: 0.7rem; text-transform: uppercase; display: inline-block; min-width: 60px; text-align: center; font-weight: bold; }
     .badge-approved { background: #c8e6c9; color: #1b5e20; }
     .badge-rejected { background: #ffcdd2; color: #b71c1c; }
     .badge-pending { background: #eee; color: #555; }
+    .badge-modified { background: #fff9c4; color: #f57f17; }
     .badge-frozen { background: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; padding: 5px 10px; font-size: 0.8rem; }
     .badge-frozen-approved { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; padding: 5px 10px; font-size: 0.8rem; }
-    .btn { padding: 4px 8px; border: none; border-radius: 3px; cursor: pointer; font-weight: bold; font-size: 0.75rem; margin-right: 3px; color: white; }
-    .btn-app { background: var(--pos); }
-    .btn-rej { background: var(--neg); }
-    .btn-mod { background: #1976d2; }
-    .btn-info { background: var(--info); width: 100%; margin-top: 2px; }
+    
     .chk-cell { text-align: center; vertical-align: middle; }
     input[type=checkbox] { cursor: pointer; transform: scale(1.2); }
     input:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -115,7 +118,6 @@
 
   <div id="admin-view">
     <h2 style="color: var(--primary);">Campaign Manager & Data ETL Pipeline</h2>
-
     <div class="admin-rule-builder">
       <h3 style="margin-top:0; color: #333;">Step 1: Raw Data Ingestion & Mapping</h3>
       <div style="display:flex; gap: 10px; align-items:center;">
@@ -154,7 +156,7 @@
           <div class="admin-field"><label>Class Code</label><select id="admin-class"><option value="ALL">-- ALL --</option></select></div>
         </div>
         <div style="display:flex; align-items:flex-end; gap: 15px; margin-top: 10px;">
-          <div class="admin-field" style="width: 150px;"><label>% Increase</label><input type="number" id="admin-pct" placeholder="e.g. 5" step="0.1"></div>
+          <div class="admin-field" style="width: 150px;"><label>% Increase</label><input type="number" id="admin-pct" placeholder="e.g. 5" step="1"></div>
           <button class="btn-main" style="width:150px; background: var(--accent);" onclick="addCampaignRule()">Add Rule</button>
         </div>
       </div>
@@ -177,31 +179,56 @@
   </div>
 
   <div id="dashboard-view">
-    <div class="summary-bar"><div class="summary-card"><div class="summary-label">Total Est Impact</div><div id="total-est" class="summary-value val-est">$0.00</div></div><div class="summary-card"><div class="summary-label">Total Realized</div><div id="total-real" class="summary-value val-real">$0.00</div></div></div>
-    <div id="bulk-bar" class="bulk-bar"><div class="bulk-info"><span id="selected-count">0</span> items selected</div><div class="bulk-btns"><button class="btn-bulk btn-app" onclick="bulkDecide('APPROVED')">Approve</button><button class="btn-bulk btn-rej" onclick="openCommentModal('BULK')">Reject</button></div></div>
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
+      <div class="how-to-text">
+        <strong>How to use:</strong> Select lines that need modification. You can edit the blue fields directly.<br>
+        <span style="color:var(--neg);">* Mandatory comment required for a 0% increase (Rejected).</span>
+      </div>
+      <div class="summary-bar" style="margin-bottom: 0;">
+        <div class="summary-card"><div class="summary-label">Total Est Impact</div><div id="total-est" class="summary-value val-est">$0.00</div></div>
+        <div class="summary-card"><div class="summary-label">Total Realized</div><div id="total-real" class="summary-value val-real">$0.00</div></div>
+      </div>
+    </div>
+    
+    <div id="bulk-bar" class="bulk-bar">
+      <div class="bulk-info"><span id="selected-count">0</span> items selected</div>
+      <div class="bulk-btns" style="display:flex; gap:10px; align-items:center;">
+        <input type="number" id="bulk-pct-input" placeholder="% Inc" style="width:70px;" class="input-editable" step="1">
+        <input type="date" id="bulk-date-input" class="input-editable">
+        <button class="btn-bulk" style="background:#1976d2;" onclick="bulkApply()">Apply Updates</button>
+        <span style="border-left: 1px solid #ccc; height: 20px; margin: 0 5px;"></span>
+        <button class="btn-bulk btn-app" onclick="bulkDecide('APPROVED')">Approve Selected</button>
+      </div>
+    </div>
+
     <div class="controls">
       <div style="display:flex;align-items:center;gap:10px;">
         <label><b>View:</b></label>
-        <select id="status-filter" class="main-filter" onchange="triggerFilter()"><option value="ALL">Show All</option><option value="PENDING" selected>Pending</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option></select>
+        <select id="status-filter" class="main-filter" onchange="triggerFilter()">
+          <option value="ALL" selected>Show All</option>
+          <option value="PENDING">Pending</option>
+          <option value="APPROVED">Approved</option>
+          <option value="MODIFIED">Modified</option>
+          <option value="REJECTED">Rejected</option>
+        </select>
         <button class="btn-cancel" style="padding: 5px 15px; font-size: 0.8rem;" onclick="clearAllFilters()">Clear All Filters</button>
         <button class="btn-export" onclick="exportToExcel()">Export Data</button>
-        <button class="btn-export" style="background:var(--primary); display:none;" onclick="openPdfModal()">PDF Letters</button>
         <button id="btn-submit-portfolio" class="btn-submit-pf" onclick="submitPortfolioAE()">Submit Portfolio</button>
         <span id="portfolio-status-badge" class="status-badge badge-frozen" style="display:none;"></span>
       </div>
       <div id="stats" style="color:#666; font-size:0.9rem;"></div>
     </div>
-    <div id="table-container"></div>
+    <div id="table-container" style="overflow-x: auto;"></div>
   </div>
 
-  <div id="modify-modal" class="modal-overlay"><div class="modal-box"><h3>Modify Price</h3><input type="number" id="modal-price" class="modal-input" step="0.01"><input type="text" id="modify-comment" class="modal-input" placeholder="Reason (Optional)"><div class="modal-actions"><button class="btn-cancel" onclick="closeModals()">Cancel</button><button class="btn-confirm" onclick="confirmModify()">Save</button></div></div></div>
   <div id="comment-modal" class="modal-overlay"><div class="modal-box"><h3>Reason Required</h3><textarea id="modal-comment" class="modal-textarea" placeholder="Enter reason..."></textarea><div class="modal-actions"><button class="btn-cancel" onclick="closeModals()">Cancel</button><button class="btn-confirm" onclick="confirmRejection()">Submit</button></div></div></div>
   <div id="impact-modal" class="modal-overlay"><div class="modal-box"><h3>Impacted Accounts</h3><div id="impact-list" class="modal-list-container"></div><div class="modal-actions"><button class="btn-confirm" onclick="closeImpactModal()">Close</button></div></div></div>
-  <div id="pdf-modal" class="modal-overlay"><div class="modal-box"><h3>Generate Letter</h3><select id="pdf-customer-select" class="modal-input"></select><div class="modal-actions"><button class="btn-cancel" onclick="closePdfModal()">Cancel</button><button class="btn-confirm" id="btn-generate-pdf" onclick="generatePDFFrontend()">Download</button></div></div></div>
 
   <script>
     let ROW_DATA = []; let PORTFOLIO_STATUS = "Not Submitted"; let USER_CACHE = { AE: [], SC: [] }; let CURRENT_LIST = []; 
-    let CAMPAIGN_RULES = []; let pendingAction = null; let PENDING_EDIT_IDX = null; let debounceTimer;
+    let CAMPAIGN_RULES = []; let pendingAction = null; let debounceTimer;
+
+    const DEFAULT_START_DATE = "2026-02-25";
 
     const REQUIRED_MAPPING_FIELDS = [
       { id: 'map_pl', label: 'Price List' }, { id: 'map_item', label: 'Item Number' }, { id: 'map_desc', label: 'Description' },
@@ -258,31 +285,31 @@
         const user = document.getElementById('user-input').value; if(!user) return alert("Select user.");
         document.getElementById('dashboard-view').style.display = 'block'; document.getElementById('current-user').innerText = `${role}: ${user}`;
         
-        // Setup table skeleton ensuring headers remain static so filters don't lose focus
         document.getElementById('table-container').innerHTML = `
-          <table id="main-data-table">
+          <table id="main-data-table" style="min-width: 1500px;">
             <thead>
               <tr>
-                <th width="3%" class="chk-cell"><input type="checkbox" id="master-chk" onclick="toggleAll(this)"></th>
-                <th width="10%">Price List <br><input type="text" class="filter-input" data-col="priceList" onkeyup="triggerFilter()"></th>
-                <th width="7%">Item # <br><input type="text" class="filter-input" data-col="itemNum" onkeyup="triggerFilter()"></th>
-                <th width="15%">Description <br><input type="text" class="filter-input" data-col="desc" onkeyup="triggerFilter()"></th>
-                <th width="7%">Acct Exec <br><input type="text" class="filter-input" data-col="salesPerson" onkeyup="triggerFilter()"></th>
-                <th width="5%">L12M Qty</th>
-                <th width="9%">Start Date</th>
-                <th width="6%" class="col-price">Curr Price <br><input type="text" class="filter-input" data-col="currPrice" placeholder=">50" onkeyup="triggerFilter()"></th>
-                <th width="6%" class="col-price">Sugg Price</th>
-                <th width="5%" class="col-price">Sugg %</th>
+                <th width="2%" class="chk-cell"><input type="checkbox" id="master-chk" onclick="toggleAll(this)"></th>
+                <th width="7%">Price List <br><input type="text" class="filter-input" data-col="priceList" onkeyup="triggerFilter()"></th>
+                <th width="6%">Item # <br><input type="text" class="filter-input" data-col="itemNum" onkeyup="triggerFilter()"></th>
+                <th width="14%">Description <br><input type="text" class="filter-input" data-col="desc" onkeyup="triggerFilter()"></th>
+                <th width="6%">Acct Exec <br><input type="text" class="filter-input" data-col="salesPerson" onkeyup="triggerFilter()"></th>
+                <th width="4%">L12M Qty</th>
+                <th width="5%">L12M Sales $</th>
+                <th width="4%">L12M GP %</th>
+                <th width="8%">Start Date</th>
+                <th width="5%" class="col-price">Curr Price <br><input type="text" class="filter-input" data-col="currPrice" placeholder=">50" onkeyup="triggerFilter()"></th>
+                <th width="5%" class="col-price">Sugg Price</th>
+                <th width="4%" class="col-price">Sugg %</th>
                 <th width="6%" class="col-price">Est Imp</th>
                 <th width="6%" class="col-price">Final $</th>
-                <th width="5%" class="col-price">Mod %</th>
+                <th width="5%" class="col-price">Final %</th>
                 <th width="6%">Status</th>
-                <th width="8%">Comments</th>
-                <th width="8%">Action</th>
+                <th width="11%">Comments</th>
               </tr>
             </thead>
             <tbody id="table-body">
-              <tr><td colspan="16" style="text-align:center; padding:20px; color:#00505c; font-weight:bold;">Fetching Data from Secure Shard...</td></tr>
+              <tr><td colspan="17" style="text-align:center; padding:20px; color:#00505c; font-weight:bold;">Fetching Data from Secure Shard...</td></tr>
             </tbody>
           </table>
         `;
@@ -296,85 +323,17 @@
       document.getElementById('login-view').style.display = 'flex'; document.getElementById('btn-back').style.display = 'none';
     }
 
-    // --- ADMIN CSV MAPPING ---
-    function fetchCsvHeaders() {
-      const folderId = document.getElementById('drive-folder-id').value; if (!folderId) return alert("Need Folder ID");
-      const btn = document.getElementById('btn-fetch-csv'); btn.innerText = "Fetching..."; btn.disabled = true;
-      google.script.run.withSuccessHandler(h => {
-        btn.innerText = "Fetch Headers"; btn.disabled = false;
-        let opts = `<option value="">-- Ignore --</option>` + h.map((head, i) => `<option value="${i}">${head}</option>`).join('');
-        document.getElementById('map-grid-items').innerHTML = REQUIRED_MAPPING_FIELDS.map(f => `<div class="map-field"><label>${f.label}</label><select id="${f.id}">${opts}</select></div>`).join('');
-        document.getElementById('mapping-container').style.display = 'block';
-      }).withFailureHandler(err => { btn.innerText = "Fetch Headers"; btn.disabled = false; alert(err.message); }).getHeadersFromCSVFolder(folderId);
-    }
-
-    // --- ADMIN HIERARCHY MAPPING ---
-    function fetchHierarchyHeaders() {
-      const sId = document.getElementById('hier-sheet-id').value; const tName = document.getElementById('hier-tab-name').value;
-      if(!sId || !tName) return alert("Need Sheet ID and Tab Name");
-      const btn = document.getElementById('btn-fetch-hier'); btn.innerText = "Loading..."; btn.disabled = true;
-      google.script.run.withSuccessHandler(h => {
-        btn.innerText = "Fetch Headers"; btn.disabled = false;
-        let opts = `<option value="">-- Ignore --</option>` + h.map((head, i) => `<option value="${i}">${head}</option>`).join('');
-        document.getElementById('hier-grid-items').innerHTML = HIERARCHY_MAPPING_FIELDS.map(f => `<div class="map-field"><label>${f.label}</label><select id="${f.id}">${opts}</select></div>`).join('');
-        document.getElementById('hier-mapping-container').style.display = 'block';
-      }).withFailureHandler(err => { btn.innerText = "Fetch Headers"; btn.disabled = false; alert(err.message); }).getHeadersFromHierarchySheet(sId, tName);
-    }
-
-    function loadSegmentsFromCSV() {
-      const payload = { csvFolderId: document.getElementById('drive-folder-id').value, csvMap: {} };
-      REQUIRED_MAPPING_FIELDS.forEach(f => { payload.csvMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : ""; });
-      if(!payload.csvFolderId || document.getElementById('map-grid-items').innerHTML === "") { return alert("Please complete Step 1 (CSV Ingestion & Mapping) first."); }
-
-      const btn = document.getElementById('btn-load-segments'); btn.innerText = "Scanning CSVs..."; btn.disabled = true;
-      google.script.run.withSuccessHandler(dims => {
-        btn.innerText = "Segments Loaded!";
-        if (!dims) return;
-        ['admin-seg1','admin-seg2','admin-seg3','admin-seg4','admin-seg5','admin-class'].forEach(id => {
-          let key = id.replace('admin-',''); if(key==='class') key='classCode';
-          document.getElementById(id).innerHTML = `<option value="ALL">-- ALL --</option>` + dims[key].map(v => `<option value="${v}">${v}</option>`).join('');
-        });
-        document.getElementById('rules-grid-container').style.display = 'block';
-      }).withFailureHandler(err => { btn.innerText = "Load Segments from Mapped CSVs"; btn.disabled = false; alert(err.message); }).getCampaignDimensionsFromCSV(payload);
-    }
-
-    function addCampaignRule() {
-      const pct = parseFloat(document.getElementById('admin-pct').value); if(isNaN(pct)) return alert("Valid % required.");
-      CAMPAIGN_RULES.push({ seg1: document.getElementById('admin-seg1').value, seg2: document.getElementById('admin-seg2').value, seg3: document.getElementById('admin-seg3').value, seg4: document.getElementById('admin-seg4').value, seg5: document.getElementById('admin-seg5').value, classCode: document.getElementById('admin-class').value, pct: pct });
-      renderAdminRules();
-    }
-    
+    // --- ADMIN MAPPING ---
+    function fetchCsvHeaders() { const folderId = document.getElementById('drive-folder-id').value; if (!folderId) return alert("Need Folder ID"); const btn = document.getElementById('btn-fetch-csv'); btn.innerText = "Fetching..."; btn.disabled = true; google.script.run.withSuccessHandler(h => { btn.innerText = "Fetch Headers"; btn.disabled = false; let opts = `<option value="">-- Ignore --</option>` + h.map((head, i) => `<option value="${i}">${head}</option>`).join(''); document.getElementById('map-grid-items').innerHTML = REQUIRED_MAPPING_FIELDS.map(f => `<div class="map-field"><label>${f.label}</label><select id="${f.id}">${opts}</select></div>`).join(''); document.getElementById('mapping-container').style.display = 'block'; }).withFailureHandler(err => { btn.innerText = "Fetch Headers"; btn.disabled = false; alert(err.message); }).getHeadersFromCSVFolder(folderId); }
+    function fetchHierarchyHeaders() { const sId = document.getElementById('hier-sheet-id').value; const tName = document.getElementById('hier-tab-name').value; if(!sId || !tName) return alert("Need Sheet ID and Tab Name"); const btn = document.getElementById('btn-fetch-hier'); btn.innerText = "Loading..."; btn.disabled = true; google.script.run.withSuccessHandler(h => { btn.innerText = "Fetch Headers"; btn.disabled = false; let opts = `<option value="">-- Ignore --</option>` + h.map((head, i) => `<option value="${i}">${head}</option>`).join(''); document.getElementById('hier-grid-items').innerHTML = HIERARCHY_MAPPING_FIELDS.map(f => `<div class="map-field"><label>${f.label}</label><select id="${f.id}">${opts}</select></div>`).join(''); document.getElementById('hier-mapping-container').style.display = 'block'; }).withFailureHandler(err => { btn.innerText = "Fetch Headers"; btn.disabled = false; alert(err.message); }).getHeadersFromHierarchySheet(sId, tName); }
+    function loadSegmentsFromCSV() { const payload = { csvFolderId: document.getElementById('drive-folder-id').value, csvMap: {} }; REQUIRED_MAPPING_FIELDS.forEach(f => { payload.csvMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : ""; }); if(!payload.csvFolderId || document.getElementById('map-grid-items').innerHTML === "") { return alert("Please complete Step 1 (CSV Ingestion & Mapping) first."); } const btn = document.getElementById('btn-load-segments'); btn.innerText = "Scanning CSVs..."; btn.disabled = true; google.script.run.withSuccessHandler(dims => { btn.innerText = "Segments Loaded!"; if (!dims) return; ['admin-seg1','admin-seg2','admin-seg3','admin-seg4','admin-seg5','admin-class'].forEach(id => { let key = id.replace('admin-',''); if(key==='class') key='classCode'; document.getElementById(id).innerHTML = `<option value="ALL">-- ALL --</option>` + dims[key].map(v => `<option value="${v}">${v}</option>`).join(''); }); document.getElementById('rules-grid-container').style.display = 'block'; }).withFailureHandler(err => { btn.innerText = "Load Segments from Mapped CSVs"; btn.disabled = false; alert(err.message); }).getCampaignDimensionsFromCSV(payload); }
+    function addCampaignRule() { const pct = parseFloat(document.getElementById('admin-pct').value); if(isNaN(pct)) return alert("Valid % required."); CAMPAIGN_RULES.push({ seg1: document.getElementById('admin-seg1').value, seg2: document.getElementById('admin-seg2').value, seg3: document.getElementById('admin-seg3').value, seg4: document.getElementById('admin-seg4').value, seg5: document.getElementById('admin-seg5').value, classCode: document.getElementById('admin-class').value, pct: pct }); renderAdminRules(); }
     function removeAdminRule(index) { CAMPAIGN_RULES.splice(index, 1); renderAdminRules(); }
-    
-    function renderAdminRules() {
-      const tb = document.getElementById('admin-rules-body');
-      if (CAMPAIGN_RULES.length === 0) return tb.innerHTML = `<tr><td colspan="8" style="text-align:center;">No rules.</td></tr>`;
-      tb.innerHTML = CAMPAIGN_RULES.map((r, i) => `<tr><td>${r.seg1}</td><td>${r.seg2}</td><td>${r.seg3}</td><td>${r.seg4}</td><td>${r.seg5}</td><td>${r.classCode}</td><td class="sugg-price">+${r.pct}%</td><td><button class="btn-remove-rule" onclick="removeAdminRule(${i})">Remove</button></td></tr>`).join('');
-    }
-
-    function executeFullPipeline() {
-      if(!confirm("Are you sure? This will execute the Campaign ETL and write new Shard files per AE to Drive.")) return;
-      const payload = { csvFolderId: document.getElementById('drive-folder-id').value, csvMap: {}, hierSheetId: document.getElementById('hier-sheet-id').value, hierTab: document.getElementById('hier-tab-name').value, hierMap: {}, campaignRules: CAMPAIGN_RULES };
-
-      REQUIRED_MAPPING_FIELDS.forEach(f => payload.csvMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : "");
-      if(payload.csvMap.map_ae === "") return alert("CSV Map: 'AE Name' is mandatory for Hub and Spoke routing.");
-
-      HIERARCHY_MAPPING_FIELDS.forEach(f => payload.hierMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : "");
-      if(payload.hierMap.hmap_ae === "") return alert("Hierarchy Map: 'AE Name' is mandatory to join data.");
-
-      const btn = document.getElementById('btn-exec-pipeline'); const resDiv = document.getElementById('pipeline-results');
-      btn.innerText = "PROCESSING PIPELINE... (DO NOT CLOSE)"; btn.disabled = true; resDiv.innerHTML = "Working... This may take several minutes depending on volume.";
-
-      google.script.run.withSuccessHandler(r => {
-        btn.innerText = "EXECUTE PIPELINE"; btn.disabled = false;
-        let h = `<strong style="color:var(--pos)">SUCCESS! Processed ${r.processed} Rows into Hub & Spoke Shards.</strong><br><a href="${r.folderUrl}" target="_blank">Open Master Output Folder</a><br><br>`;
-        r.files.forEach(f => h += `• ${f.key} (${f.count} rows) - <a href="${f.url}" target="_blank">View File</a><br>`);
-        resDiv.innerHTML = h;
-      }).withFailureHandler(e => { btn.innerText = "EXECUTE PIPELINE"; btn.disabled = false; resDiv.innerHTML = `<span style="color:red">Error: ${e.message}</span>`; }).runETLPipeline(payload);
-    }
+    function renderAdminRules() { const tb = document.getElementById('admin-rules-body'); if (CAMPAIGN_RULES.length === 0) return tb.innerHTML = `<tr><td colspan="8" style="text-align:center;">No rules.</td></tr>`; tb.innerHTML = CAMPAIGN_RULES.map((r, i) => `<tr><td>${r.seg1}</td><td>${r.seg2}</td><td>${r.seg3}</td><td>${r.seg4}</td><td>${r.seg5}</td><td>${r.classCode}</td><td class="sugg-price">+${r.pct}%</td><td><button class="btn-remove-rule" onclick="removeAdminRule(${i})">Remove</button></td></tr>`).join(''); }
+    function executeFullPipeline() { if(!confirm("Are you sure? This will execute the Campaign ETL and write new Shard files per AE to Drive.")) return; const payload = { csvFolderId: document.getElementById('drive-folder-id').value, csvMap: {}, hierSheetId: document.getElementById('hier-sheet-id').value, hierTab: document.getElementById('hier-tab-name').value, hierMap: {}, campaignRules: CAMPAIGN_RULES }; REQUIRED_MAPPING_FIELDS.forEach(f => payload.csvMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : ""); if(payload.csvMap.map_ae === "") return alert("CSV Map: 'AE Name' is mandatory for Hub and Spoke routing."); HIERARCHY_MAPPING_FIELDS.forEach(f => payload.hierMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : ""); if(payload.hierMap.hmap_ae === "") return alert("Hierarchy Map: 'AE Name' is mandatory to join data."); const btn = document.getElementById('btn-exec-pipeline'); const resDiv = document.getElementById('pipeline-results'); btn.innerText = "PROCESSING PIPELINE... (DO NOT CLOSE)"; btn.disabled = true; resDiv.innerHTML = "Working... This may take several minutes depending on volume."; google.script.run.withSuccessHandler(r => { btn.innerText = "EXECUTE PIPELINE"; btn.disabled = false; let h = `<strong style="color:var(--pos)">SUCCESS! Processed ${r.processed} Rows into Hub & Spoke Shards.</strong><br><a href="${r.folderUrl}" target="_blank">Open Master Output Folder</a><br><br>`; r.files.forEach(f => h += `• ${f.key} (${f.count} rows) - <a href="${f.url}" target="_blank">View File</a><br>`); resDiv.innerHTML = h; }).withFailureHandler(e => { btn.innerText = "EXECUTE PIPELINE"; btn.disabled = false; resDiv.innerHTML = `<span style="color:red">Error: ${e.message}</span>`; }).runETLPipeline(payload); }
 
     // --- DASHBOARD LOGIC ---
-    function formatDateForInput(dateStr) { if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr; return "2026-02-25"; }
+    function formatDateForInput(dateStr) { if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr; return DEFAULT_START_DATE; }
 
     function renderTable() {
       const body = document.getElementById('table-body');
@@ -397,19 +356,30 @@
           } return true;
       });
 
-      if(visibleItems.length === 0) { body.innerHTML = "<tr><td colspan='16' style='text-align:center; padding:20px; font-weight:bold; color:#a73321;'>✅ No Items Found matching filters</td></tr>"; document.getElementById('stats').innerText = "Showing 0 items"; return; }
+      if(visibleItems.length === 0) { body.innerHTML = "<tr><td colspan='17' style='text-align:center; padding:20px; font-weight:bold; color:#a73321;'>✅ No Items Found matching filters</td></tr>"; document.getElementById('stats').innerText = "Showing 0 items"; return; }
       updateTotals();
 
       let html = visibleItems.map((row) => {
         const index = ROW_DATA.indexOf(row);
-        const status = row.status || "PENDING"; const badgeClass = status === "APPROVED" ? "badge-approved" : (status === "REJECTED" ? "badge-rejected" : "badge-pending");
+        const status = row.status || "PENDING"; 
+        
+        let badgeClass = "badge-pending";
+        if (status === "APPROVED") badgeClass = "badge-approved";
+        else if (status === "REJECTED") badgeClass = "badge-rejected";
+        else if (status === "MODIFIED") badgeClass = "badge-modified";
+
         let volDisplay = row.volDisplay || row.qty.toFixed(0); 
         let finalDisplay = (row.finalPrice !== "" && row.finalPrice !== 0 && row.finalPrice !== null) ? parseFloat(row.finalPrice).toFixed(2) : "";
         let dateVal = formatDateForInput(row.startDate);
 
-        let suggPct = row.currPrice > 0 ? (((row.suggPrice - row.currPrice) / row.currPrice) * 100).toFixed(1) : 0;
-        let finalPct = row.currPrice > 0 && row.finalPrice ? (((row.finalPrice - row.currPrice) / row.currPrice) * 100).toFixed(1) : "";
+        let suggPct = row.currPrice > 0 ? Math.round(((row.suggPrice - row.currPrice) / row.currPrice) * 100) : 0;
+        let finalPct = row.currPrice > 0 && row.finalPrice ? Math.round(((row.finalPrice - row.currPrice) / row.currPrice) * 100) : "";
+        
         let modPctVal = finalPct !== "" ? finalPct : suggPct;
+        if (finalDisplay === "") finalDisplay = parseFloat(row.suggPrice).toFixed(2);
+
+        let l12mSales = "$0.00";
+        let l12mGP = "0.0%";
 
         return `<tr id="tr-${index}" class="data-row">
             <td class="chk-cell"><input type="checkbox" class="row-chk" value="${index}" onchange="updateBulkBar()"></td>
@@ -418,20 +388,17 @@
             <td>${row.desc}</td>
             <td>${row.salesPerson || ""}</td>
             <td style="font-weight:bold; color:#555">${volDisplay}</td>
-            <td><input type="date" class="date-input" value="${dateVal}" onchange="updateDate(${index}, this.value)"></td>
+            <td style="color:#555">${l12mSales}</td>
+            <td style="color:#555">${l12mGP}</td>
+            <td><input type="date" class="input-editable" style="font-family:'Roboto Mono', monospace;" value="${dateVal}" onchange="updateDate(${index}, this.value)"></td>
             <td class="col-price">$${row.currPrice.toFixed(2)}</td>
             <td class="col-price sugg-price">$${row.suggPrice.toFixed(2)}</td>
             <td class="col-price sugg-price">${suggPct}%</td>
             <td class="col-price impact-val">$${row.estImpact.toFixed(2)}</td>
-            <td class="col-price col-final">${finalDisplay ? '$'+finalDisplay : ''}</td>
-            <td class="col-price"><input type="number" step="0.1" value="${modPctVal}" style="width:60px; font-family:'Roboto Mono', monospace; border:1px solid #ccc; border-radius:3px; padding:4px;" onchange="updatePctInline(${index}, this.value)"></td>
+            <td class="col-price col-final"><input type="number" step="0.01" class="input-editable" style="font-family:'Roboto Mono', monospace;" value="${finalDisplay}" onchange="updateFinalPriceInline(${index}, this.value)"></td>
+            <td class="col-price"><input type="number" step="1" class="input-editable" style="font-family:'Roboto Mono', monospace;" value="${modPctVal}" onchange="updatePctInline(${index}, this.value)"></td>
             <td><span id="badge-${index}" class="status-badge ${badgeClass}">${status}</span></td>
-            <td id="comment-${index}" style="font-size:0.75rem; color:#555; font-style:italic;">${row.comment || ""}</td>
-            <td>
-                <button class="btn btn-app" onclick="approveLine(${index})">✔</button>
-                <button class="btn btn-mod" onclick="openModifyModal(${index})">✎</button>
-                <button class="btn btn-rej" onclick="openCommentModal('SINGLE', ${index})">✘</button>
-            </td>
+            <td><input type="text" class="input-editable" placeholder="Comment..." value="${row.comment || ""}" onchange="updateCommentInline(${index}, this.value)"></td>
         </tr>`;
       }).join('');
 
@@ -439,25 +406,86 @@
       document.getElementById('stats').innerText = `Showing ${visibleItems.length} items`;
     }
 
-    function updatePctInline(index, pctStr) {
-      let item = ROW_DATA[index];
-      let pct = parseFloat(pctStr);
-      if (isNaN(pct)) return;
-      
-      let newPrice = item.currPrice * (1 + (pct / 100));
-      item.finalPrice = newPrice;
-      
-      // Auto-Approve on inline modification to trigger network save directly.
-      decide(index, 'APPROVED', item.comment, newPrice, item.startDate);
+    function autoDetermineStatus(item) {
+       let curr = parseFloat(item.currPrice);
+       let sugg = parseFloat(item.suggPrice);
+       let finalP = parseFloat(item.finalPrice);
+       let dDate = item.startDate || DEFAULT_START_DATE;
+
+       if (Math.abs(finalP - curr) < 0.01) {
+           item.finalPrice = curr; 
+           return "REJECTED";
+       } 
+       else if (Math.abs(finalP - sugg) < 0.01 && dDate === DEFAULT_START_DATE) {
+           return "APPROVED";
+       } 
+       else {
+           return "MODIFIED";
+       }
     }
 
-    function updateDate(index, val) { ROW_DATA[index].startDate = val; }
+    function updateFinalPriceInline(index, priceStr) {
+      let item = ROW_DATA[index];
+      let price = parseFloat(priceStr);
+      if (isNaN(price)) return renderTable(); 
+      
+      if (price < item.currPrice) {
+          alert("Safeguard Alert: Final price cannot be set below the current price ($" + item.currPrice.toFixed(2) + ").");
+          return renderTable(); 
+      }
+
+      item.finalPrice = price;
+      item.status = autoDetermineStatus(item);
+      
+      if (item.status === "REJECTED" && !item.comment) {
+         openCommentModal('SINGLE', index);
+      } else {
+         decide(index, item.status, item.comment, item.finalPrice, item.startDate);
+      }
+    }
+
+    function updatePctInline(index, pctStr) {
+      let item = ROW_DATA[index];
+      let pct = parseInt(pctStr);
+      if (isNaN(pct)) return renderTable();
+      
+      let newPrice = item.currPrice * (1 + (pct / 100));
+      if (newPrice < item.currPrice) {
+          alert("Safeguard Alert: Final percentage cannot drop price below current. Percentage must be >= 0.");
+          return renderTable(); 
+      }
+
+      item.finalPrice = newPrice;
+      item.status = autoDetermineStatus(item);
+
+      if (item.status === "REJECTED" && !item.comment) {
+         openCommentModal('SINGLE', index);
+      } else {
+         decide(index, item.status, item.comment, item.finalPrice, item.startDate);
+      }
+    }
+
+    function updateDate(index, val) { 
+      let item = ROW_DATA[index];
+      item.startDate = val; 
+      if (!item.finalPrice) item.finalPrice = item.suggPrice;
+      item.status = autoDetermineStatus(item);
+      
+      decide(index, item.status, item.comment, item.finalPrice, item.startDate);
+    }
+    
+    function updateCommentInline(index, val) {
+      let item = ROW_DATA[index];
+      item.comment = val;
+      if (!item.finalPrice) item.finalPrice = item.suggPrice;
+      decide(index, item.status || 'PENDING', item.comment, item.finalPrice, item.startDate);
+    }
 
     function updateTotals() {
       let totalEst = 0; let totalReal = 0;
       ROW_DATA.forEach(row => {
         if (row.estImpact) totalEst += row.estImpact;
-        if (row.status === "APPROVED" && row.finalPrice && row.qty > 0) {
+        if ((row.status === "APPROVED" || row.status === "MODIFIED") && row.finalPrice && row.qty > 0) {
            let groupRealized = (row.finalPrice - row.currPrice) * row.qty;
            if (row.rowIds && row.rowIds.length > 0) { totalReal += (groupRealized / row.rowIds.length); }
         }
@@ -466,20 +494,93 @@
       document.getElementById('total-real').innerText = "$" + totalReal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
     }
 
-    function approveLine(index) { const item = ROW_DATA[index]; if (!item.startDate) item.startDate = "2026-02-25"; item.finalPrice = item.suggPrice; decide(index, 'APPROVED', item.comment, null, item.startDate); }
-    function openModifyModal(index) { PENDING_EDIT_IDX = index; const item = ROW_DATA[index]; document.getElementById('modal-price').value = item.finalPrice || item.suggPrice; document.getElementById('modify-comment').value = item.comment || ""; document.getElementById('modify-modal').style.display = 'block'; }
-    function confirmModify() { const price = parseFloat(document.getElementById('modal-price').value); const comment = document.getElementById('modify-comment').value; if (isNaN(price)) return alert("Invalid Price"); const date = ROW_DATA[PENDING_EDIT_IDX].startDate || "2026-02-25"; ROW_DATA[PENDING_EDIT_IDX].finalPrice = price; decide(PENDING_EDIT_IDX, 'APPROVED', comment, price, date); closeModals(); }
-    function openCommentModal(type, index) { pendingAction = { type: type, index: index }; document.getElementById('modal-comment').value = ""; document.getElementById('comment-modal').style.display = 'block'; }
-    function confirmRejection() { const reason = document.getElementById('modal-comment').value.trim(); if (!reason) return alert("Comment is required."); if (pendingAction.type === 'SINGLE') { ROW_DATA[pendingAction.index].finalPrice = ""; decide(pendingAction.index, 'REJECTED', reason); } else { bulkDecide('REJECTED', reason); } closeModals(); }
-    function closeModals() { document.getElementById('comment-modal').style.display = 'none'; document.getElementById('modify-modal').style.display = 'none'; pendingAction = null; PENDING_EDIT_IDX = null; }
+    function openCommentModal(type, index) { pendingAction = { type: type, index: index }; document.getElementById('modal-comment').value = ROW_DATA[index] ? ROW_DATA[index].comment || "" : ""; document.getElementById('comment-modal').style.display = 'block'; }
+    function confirmRejection() { 
+      const reason = document.getElementById('modal-comment').value.trim(); 
+      if (!reason) return alert("Comment is required for 0% increases."); 
+      
+      if (pendingAction.type === 'SINGLE') { 
+         let item = ROW_DATA[pendingAction.index];
+         item.comment = reason;
+         decide(pendingAction.index, item.status, reason, item.finalPrice, item.startDate); 
+      } else if (pendingAction.type === 'BULK_ZERO') {
+         const selected = document.querySelectorAll('.row-chk:checked');
+         const indicesToUpdate = [];
+         selected.forEach(chk => {
+           const idx = parseInt(chk.value);
+           const item = ROW_DATA[idx];
+           item.finalPrice = item.currPrice; // 0%
+           item.comment = reason;
+           if (pendingAction.date) item.startDate = pendingAction.date;
+           if (!item.startDate) item.startDate = DEFAULT_START_DATE;
+           item.status = 'REJECTED';
+           indicesToUpdate.push(idx);
+         });
+         renderTable();
+         document.getElementById('master-chk').checked = false;
+         document.getElementById('bulk-bar').style.display = 'none';
+
+         const bulkPayload = indicesToUpdate.map(idx => ({ rowIds: ROW_DATA[idx].rowIds, decision: ROW_DATA[idx].status, finalPrice: ROW_DATA[idx].finalPrice, comment: ROW_DATA[idx].comment, startDate: ROW_DATA[idx].startDate }));
+         google.script.run.submitReview(bulkPayload, document.getElementById('user-input').value);
+      }
+      closeModals(); 
+    }
+    function closeModals() { document.getElementById('comment-modal').style.display = 'none'; pendingAction = null; renderTable(); }
+
+    function bulkApply() {
+      const pctStr = document.getElementById('bulk-pct-input').value;
+      const dateVal = document.getElementById('bulk-date-input').value;
+      
+      if (!pctStr && !dateVal) return alert("Please enter a % or select a date to apply updates.");
+      
+      const selected = document.querySelectorAll('.row-chk:checked');
+      if (selected.length === 0) return alert("Select items first.");
+      
+      let pct = NaN;
+      if (pctStr !== "") {
+          pct = parseInt(pctStr);
+          if (isNaN(pct) || pct < 0) return alert("Please enter a valid percentage >= 0.");
+          if (pct === 0) {
+              pendingAction = { type: 'BULK_ZERO', date: dateVal };
+              document.getElementById('modal-comment').value = "";
+              document.getElementById('comment-modal').style.display = 'block';
+              return;
+          }
+      }
+      
+      const indicesToUpdate = [];
+      selected.forEach(chk => {
+        const idx = parseInt(chk.value); 
+        const item = ROW_DATA[idx];
+        
+        if (!isNaN(pct)) {
+            item.finalPrice = item.currPrice * (1 + (pct / 100));
+        }
+        if (dateVal) {
+            item.startDate = dateVal;
+        }
+        if(!item.startDate) item.startDate = DEFAULT_START_DATE;
+        if(!item.finalPrice) item.finalPrice = item.suggPrice;
+        
+        item.status = autoDetermineStatus(item);
+        indicesToUpdate.push(idx);
+      });
+      
+      renderTable(); 
+      document.getElementById('master-chk').checked = false; 
+      document.getElementById('bulk-bar').style.display = 'none';
+      
+      const bulkPayload = indicesToUpdate.map(idx => ({ rowIds: ROW_DATA[idx].rowIds, decision: ROW_DATA[idx].status, finalPrice: ROW_DATA[idx].finalPrice, comment: ROW_DATA[idx].comment, startDate: ROW_DATA[idx].startDate }));
+      google.script.run.submitReview(bulkPayload, document.getElementById('user-input').value);
+    }
 
     function bulkDecide(decision, comment="") {
       const selected = document.querySelectorAll('.row-chk:checked'); if (selected.length === 0) return;
       const indicesToUpdate = [];
       selected.forEach(chk => {
         const idx = parseInt(chk.value); indicesToUpdate.push(idx); const item = ROW_DATA[idx];
-        if (decision === 'APPROVED') item.finalPrice = item.suggPrice; else item.finalPrice = "";
-        item.status = decision; if(comment) item.comment = comment; if(!item.startDate) item.startDate = "2026-02-25";
+        if (decision === 'APPROVED') { if(!item.finalPrice) item.finalPrice = item.suggPrice; } else item.finalPrice = "";
+        item.status = decision; if(comment) item.comment = comment; if(!item.startDate) item.startDate = DEFAULT_START_DATE;
       });
       renderTable(); document.getElementById('master-chk').checked = false; document.getElementById('bulk-bar').style.display = 'none';
       const bulkPayload = indicesToUpdate.map(idx => ({ rowIds: ROW_DATA[idx].rowIds, decision: decision, finalPrice: ROW_DATA[idx].finalPrice, comment: ROW_DATA[idx].comment, startDate: ROW_DATA[idx].startDate }));
@@ -493,15 +594,13 @@
       google.script.run.submitReview(payload, document.getElementById('user-input').value);
     }
 
-    function openImpactModal(index) { const list = ROW_DATA[index].impacts; const container = document.getElementById('impact-list'); container.innerHTML = list.length === 0 ? "<div style='color:#666;'>No impacted accounts found.</div>" : list.map(i => `<div class="modal-list-item">${i}</div>`).join(''); document.getElementById('impact-modal').style.display = 'block'; }
-    function closeImpactModal() { document.getElementById('impact-modal').style.display = 'none'; }
     function toggleAll(master) { document.querySelectorAll('.row-chk').forEach(chk => chk.checked = master.checked); updateBulkBar(); }
     function updateBulkBar() { const count = document.querySelectorAll('.row-chk:checked').length; document.getElementById('bulk-bar').style.display = count > 0 ? 'flex' : 'none'; document.getElementById('selected-count').innerText = count; }
     function triggerFilter() { clearTimeout(debounceTimer); debounceTimer = setTimeout(renderTable, 400); }
-    function clearAllFilters() { document.querySelectorAll('.filter-input').forEach(input => input.value = ""); document.getElementById('status-filter').value = "PENDING"; renderTable(); }
+    function clearAllFilters() { document.querySelectorAll('.filter-input').forEach(input => input.value = ""); document.getElementById('status-filter').value = "ALL"; renderTable(); }
 
     function renderManagerTable(data) {
-       let html = `<table><thead><tr><th>AE Name</th><th>Total Items</th><th>Pending</th><th>Approved</th><th>Est Impact</th><th>Realized Impact</th><th>Status</th></tr></thead><tbody>`;
+       let html = `<table><thead><tr><th>AE Name</th><th>Total Items</th><th>Pending</th><th>Approved/Mod</th><th>Est Impact</th><th>Realized Impact</th><th>Status</th></tr></thead><tbody>`;
        data.forEach(row => {
            let badgeColor = row.portfolioStatus === "Approved" ? "badge-approved" : (row.portfolioStatus === "Pending Approval" ? "badge-frozen" : "badge-pending");
            html += `<tr><td><b>${row.aeName}</b></td><td>${row.total}</td><td>${row.pending}</td><td>${row.approved}</td><td class="val-est">$${row.estImpact.toFixed(2)}</td><td class="val-real">$${row.realized.toFixed(2)}</td><td><span class="status-badge ${badgeColor}">${row.portfolioStatus}</span></td></tr>`;
@@ -523,27 +622,6 @@
            csvContent += rArray.join(",") + "\n";
        });
        const encodedUri = encodeURI(csvContent); const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", "BulkPack_Export.csv"); document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    }
-
-    function openPdfModal() {
-       const user = document.getElementById('user-input').value; const role = document.querySelector('input[name="role"]:checked').value;
-       document.getElementById('pdf-customer-select').innerHTML = '<option>Loading...</option>'; document.getElementById('pdf-modal').style.display = 'block';
-       google.script.run.withSuccessHandler(accts => {
-         let html = accts.length === 0 ? '<option value="">No Approved Accounts Found</option>' : accts.map(a => `<option value="${a.num}">${a.num} - ${a.name}</option>`).join('');
-         document.getElementById('pdf-customer-select').innerHTML = html;
-       }).getApprovedAccounts(user, role);
-    }
-    
-    function closePdfModal() { document.getElementById('pdf-modal').style.display = 'none'; }
-    
-    function generatePDFFrontend() {
-       const user = document.getElementById('user-input').value; const role = document.querySelector('input[name="role"]:checked').value; const acct = document.getElementById('pdf-customer-select').value;
-       if (!acct) return alert("Select an account.");
-       const btn = document.getElementById('btn-generate-pdf'); btn.innerText = "Generating..."; btn.disabled = true;
-       google.script.run.withSuccessHandler(res => {
-         btn.innerText = "Download"; btn.disabled = false; closePdfModal();
-         const link = document.createElement('a'); link.href = `data:application/pdf;base64,${res.base64}`; link.download = res.filename; link.click();
-       }).withFailureHandler(err => { btn.innerText = "Download"; btn.disabled = false; alert(err.message); }).generatePDF(user, role, acct);
     }
   </script>
 </body>
