@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <?!= include('CSS'); ?>
+</head>
+<body>
+
+  <div id="custom-modal-overlay" class="custom-alert-overlay">
+    <div class="modal-box">
+      <h3 id="custom-modal-title" style="margin-top:0; color:var(--primary);">Notification</h3>
+      <div id="custom-modal-msg" class="custom-alert-msg"></div>
+      <div class="modal-actions">
+        <button id="btn-custom-cancel" class="btn-cancel" style="display:none;">Cancel</button>
+        <button id="btn-custom-ok" class="btn-confirm">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="initial-loader" class="loader-overlay"><div class="loader-spinner"></div><div style="font-weight:bold; color:#00505c">Loading...</div></div>
+  <div class="navbar"><div style="display:flex;align-items:center;gap:20px;"><button id="btn-back" class="btn-back" onclick="goBack()">← Back</button><img id="app-logo" class="navbar-logo" style="display:none; padding: 2px;"><h2>May 2026 Increase - Western Region</h2></div><div id="current-user" style="font-size:0.9rem;opacity:0.9"></div></div>
+  
+  <div id="login-view">
+    <div class="login-box">
+      <h3 id="login-title" style="margin-top:0; color:var(--primary)">Identity Selection</h3>
+      <div class="role-switch" id="role-container">
+        </div>
+      <div class="dropdown-container" id="dropdown-wrapper">
+        <input type="text" id="user-input" class="dropdown-input" placeholder="Select or type name..." onkeyup="filterDropdown()" onfocus="showDropdown()">
+        <div id="user-list" class="dropdown-list"></div>
+      </div>
+      <button class="btn-main" id="btn-start" onclick="start()">Start Review</button>
+    </div>
+  </div>
+
+  <div id="manager-view">
+    <h2 style="color: var(--primary);">Regional Team Progress</h2>
+    <div class="summary-bar"><div class="summary-card"><div class="summary-label">Total Regional Est Impact</div><div id="mgr-total-est" class="summary-value val-est">$0.00</div></div><div class="summary-card"><div class="summary-label">Total Regional Realized</div><div id="mgr-total-real" class="summary-value val-real">$0.00</div></div></div>
+    <div id="manager-table-container"></div>
+  </div>
+
+  <div id="admin-view">
+    <h2 style="color: var(--primary);">Campaign Manager & Data ETL Pipeline</h2>
+    
+    <div class="admin-rule-builder">
+      <h3 style="margin-top:0; color: #333;">Global Campaign Settings</h3>
+      <div style="display:flex; gap: 15px; align-items:flex-end;">
+        <div class="admin-field" style="width: 200px;">
+          <label>Default Start Date</label>
+          <input type="date" id="admin-default-date">
+        </div>
+        <button class="btn-main" style="width:150px; background:var(--primary);" onclick="saveAdminSettings(this)">Save Date</button>
+      </div>
+    </div>
+
+    <div class="admin-rule-builder">
+      <h3 style="margin-top:0; color: #333;">Step 1: Raw Data Ingestion & Mapping</h3>
+      <div style="display:flex; gap: 10px; align-items:center;">
+        <input type="text" id="drive-folder-id" class="dropdown-input" placeholder="Drive Folder ID..." style="flex:1;">
+        <button class="btn-main" style="width:150px;" id="btn-fetch-csv" onclick="fetchCsvHeaders()">Fetch Headers</button>
+      </div>
+      <div id="mapping-container" style="display:none;">
+        <h4 style="color:var(--primary); margin-top: 20px; border-bottom: 1px solid #ccc; padding-bottom: 5px;">Map Required CSV Fields</h4>
+        <div class="map-grid" id="map-grid-items"></div>
+      </div>
+    </div>
+
+    <div class="admin-rule-builder">
+      <h3 style="margin-top:0; color: #333;">Step 2: Map User Hierarchy</h3>
+      <div style="display:flex; gap: 10px; align-items:center;">
+        <input type="text" id="hier-sheet-id" class="dropdown-input" placeholder="Google Sheet ID..." style="flex:2;">
+        <input type="text" id="hier-tab-name" class="dropdown-input" placeholder="Tab Name..." style="flex:1;">
+        <button class="btn-main" style="width:150px;" id="btn-fetch-hier" onclick="fetchHierarchyHeaders()">Fetch Headers</button>
+      </div>
+      <div id="hier-mapping-container" style="display:none;">
+        <h4 style="color:var(--primary); margin-top: 20px; border-bottom: 1px solid #ccc; padding-bottom: 5px;">Map Hierarchy Columns</h4>
+        <div class="map-grid" id="hier-grid-items"></div>
+      </div>
+    </div>
+
+    <div class="admin-rule-builder">
+      <h3 style="margin-top:0; color: #333;">Step 3: Define Target Group & Increase</h3>
+      <button class="btn-main" style="width:auto; padding: 8px 20px;" id="btn-load-segments" onclick="loadSegmentsFromCSV()">Load Segments from Mapped CSVs</button>
+      <div id="rules-grid-container" style="display:none; margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
+        <div class="admin-grid">
+          <div class="admin-field"><label>Segment 1</label><select id="admin-seg1"><option value="ALL">-- ALL --</option></select></div>
+          <div class="admin-field"><label>Segment 2</label><select id="admin-seg2"><option value="ALL">-- ALL --</option></select></div>
+          <div class="admin-field"><label>Segment 3</label><select id="admin-seg3"><option value="ALL">-- ALL --</option></select></div>
+          <div class="admin-field"><label>Segment 4</label><select id="admin-seg4"><option value="ALL">-- ALL --</option></select></div>
+          <div class="admin-field"><label>Segment 5</label><select id="admin-seg5"><option value="ALL">-- ALL --</option></select></div>
+          <div class="admin-field"><label>Class Code</label><select id="admin-class"><option value="ALL">-- ALL --</option></select></div>
+        </div>
+        <div style="display:flex; align-items:flex-end; gap: 15px; margin-top: 10px;">
+          <div class="admin-field" style="width: 150px;"><label>% Increase</label><input type="number" id="admin-pct" placeholder="e.g. 5" step="1"></div>
+          <button class="btn-main" style="width:150px; background: var(--accent);" onclick="addCampaignRule()">Add Rule</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-rule-builder rule-table">
+      <h3 style="margin-top:0; color: #333;">Queued Campaign Rules</h3>
+      <table id="admin-rules-table">
+        <thead><tr><th>Seg 1</th><th>Seg 2</th><th>Seg 3</th><th>Seg 4</th><th>Seg 5</th><th>Class Code</th><th class="col-price">Increase</th><th>Action</th></tr></thead>
+        <tbody id="admin-rules-body"><tr><td colspan="8" style="text-align:center; color:#999; padding:20px;">No rules added yet.</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="admin-rule-builder" style="text-align:center; background: #e8f5e9; border: 1px solid #c8e6c9;">
+      <h3 style="margin-top:0; color: #2e7d32;">Step 4: Execute ETL Pipeline</h3>
+      <p style="font-size: 0.9rem; color: #555; margin-bottom: 20px;">This will parse all CSVs, join the user hierarchy, run the campaign math, and generate a Hub and Spoke directory mapping.</p>
+      <button class="btn-main" style="background:var(--pos); width:250px; font-size:1.1rem;" id="btn-exec-pipeline" onclick="executeFullPipeline()">EXECUTE PIPELINE</button>
+      <div id="pipeline-results" style="margin-top:15px; text-align:left; font-size:0.9rem;"></div>
+    </div>
+  </div>
+
+  <div id="dashboard-view">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
+      <div class="how-to-text">
+        <strong>How to use:</strong> Select lines that need modification. You can edit the blue fields directly.<br>
+        <span style="color:var(--neg);">* Mandatory comment required for a 0% increase (Rejected).</span>
+      </div>
+      <div class="summary-bar" style="margin-bottom: 0;">
+        <div class="summary-card"><div class="summary-label">Total Est Impact</div><div id="total-est" class="summary-value val-est">$0.00</div></div>
+        <div class="summary-card"><div class="summary-label">Total Realized</div><div id="total-real" class="summary-value val-real">$0.00</div></div>
+      </div>
+    </div>
+    
+    <div id="bulk-bar" class="bulk-bar">
+      <div class="bulk-info"><span id="selected-count">0</span> items selected</div>
+      <div class="bulk-btns" style="display:flex; gap:10px; align-items:center;">
+        <input type="number" id="bulk-pct-input" placeholder="% Inc" style="width:70px;" class="input-editable" step="1">
+        <input type="date" id="bulk-date-input" class="input-editable">
+        <button class="btn-bulk" style="background:#1976d2;" onclick="bulkApply()">Apply Updates</button>
+        <span style="border-left: 1px solid #ccc; height: 20px; margin: 0 5px;"></span>
+        <button class="btn-bulk btn-app" onclick="bulkDecide('APPROVED')">Approve Selected</button>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <label><b>View:</b></label>
+        <select id="status-filter" class="main-filter" onchange="triggerFilter()">
+          <option value="ALL" selected>Show All</option>
+          <option value="PENDING">Pending</option>
+          <option value="APPROVED">Approved</option>
+          <option value="MODIFIED">Modified</option>
+          <option value="REJECTED">Rejected</option>
+        </select>
+        <button class="btn-cancel" style="padding: 5px 15px; font-size: 0.8rem;" onclick="clearAllFilters()">Clear All Filters</button>
+        <button class="btn-export" onclick="exportToExcel()">Export Data</button>
+        <button id="btn-submit-portfolio" class="btn-submit-pf" onclick="submitPortfolioAE()">Submit Portfolio</button>
+        <span id="portfolio-status-badge" class="status-badge badge-frozen" style="display:none;"></span>
+      </div>
+      <div id="stats" style="color:#666; font-size:0.9rem;"></div>
+    </div>
+    <div id="table-container" style="overflow-x: auto;"></div>
+  </div>
+
+  <div id="comment-modal" class="modal-overlay"><div class="modal-box"><h3>Reason Required</h3><textarea id="modal-comment" class="modal-textarea" placeholder="Enter reason..."></textarea><div class="modal-actions"><button class="btn-cancel" onclick="closeModals()">Cancel</button><button class="btn-confirm" onclick="confirmRejection()">Submit</button></div></div></div>
+  <div id="impact-modal" class="modal-overlay"><div class="modal-box"><h3>Impacted Accounts</h3><div id="impact-list" class="modal-list-container"></div><div class="modal-actions"><button class="btn-confirm" onclick="closeImpactModal()">Close</button></div></div></div>
+
+  <script>
+    const PAGE_CONTEXT = "<?= pageContext ?>";
+  </script>
+  <?!= include('JavaScript'); ?>
+
+</body>
+</html>
