@@ -4,6 +4,20 @@
 
   let DEFAULT_START_DATE = "2026-02-25";
 
+  const REQUIRED_MAPPING_FIELDS = [
+    { id: 'map_pl', label: 'Price List' }, { id: 'map_item', label: 'Item Number' }, { id: 'map_desc', label: 'Description' },
+    { id: 'map_price', label: 'Current Price' }, { id: 'map_vol', label: 'Volume (Qty)' }, { id: 'map_acct_num', label: 'Account Number' },
+    { id: 'map_acct_name', label: 'Account Name' }, { id: 'map_ae', label: 'AE Name (Join Key)' }, { id: 'map_sc', label: 'SC Name (Fallback)' },
+    { id: 'map_class', label: 'Class Code' }, { id: 'map_seg1', label: 'Segment 1' }, { id: 'map_seg2', label: 'Segment 2' },
+    { id: 'map_seg3', label: 'Segment 3' }, { id: 'map_seg4', label: 'Segment 4' }, { id: 'map_seg5', label: 'Segment 5' },
+    { id: 'map_l12m_sales', label: 'L12M Sales $' }, { id: 'map_l12m_gp', label: 'L12M GP $' }
+  ];
+
+  const HIERARCHY_MAPPING_FIELDS = [
+    { id: 'hmap_ae', label: 'AE Name (Match to CSV)' }, { id: 'hmap_sc', label: 'SC Name' }, 
+    { id: 'hmap_mgr', label: 'Manager Name' }, { id: 'hmap_reg', label: 'Region' }, { id: 'hmap_email', label: 'AE Email' }
+  ];
+
   // --- CUSTOM UI ALERTS/CONFIRMS ---
   function customAlert(msg, title = "Notification") {
     document.getElementById('custom-modal-title').innerText = title;
@@ -90,8 +104,10 @@
     } else if (role === 'MGR') {
       document.getElementById('btn-back').style.display = 'none';
       document.getElementById('manager-view').style.display = 'block'; document.getElementById('current-user').innerText = `Manager View`;
-      document.getElementById('manager-table-container').innerHTML = '<div class="loading" style="padding:20px; text-align:center; font-weight:bold;">Loading Manager Data...</div>';
-      google.script.run.withSuccessHandler(renderManagerTable).getManagerSummary();
+      document.getElementById('manager-table-container').innerHTML = '<div class="loading" style="padding:20px; text-align:center; font-weight:bold;">Loading Manager Data (Fast Cache)...</div>';
+      
+      // OPTIMIZATION: Pass "false" to trigger the instant cache load
+      google.script.run.withSuccessHandler(renderManagerTable).getManagerSummary(false);
     } else {
       const user = document.getElementById('user-input').value; if(!user) { document.getElementById('login-view').style.display = 'flex'; document.getElementById('btn-back').style.display = 'none'; return customAlert("Select user."); }
       document.getElementById('dashboard-view').style.display = 'block'; document.getElementById('current-user').innerText = `${role}: ${user}`;
@@ -129,6 +145,28 @@
     }
   }
 
+  // --- NEW: Manager Deep Sync Logic ---
+  function refreshManagerData() {
+    const btn = document.getElementById('btn-refresh-mgr');
+    btn.innerText = "Syncing...";
+    btn.disabled = true;
+    document.getElementById('manager-table-container').innerHTML = '<div class="loading" style="padding:20px; text-align:center; font-weight:bold; color:var(--primary);">Deep scanning all AE files... This may take up to 30 seconds.</div>';
+    
+    // Pass "true" to force the backend to open every spreadsheet and recalculate
+    google.script.run
+      .withSuccessHandler(data => {
+        btn.innerText = "↻ Force Deep Sync";
+        btn.disabled = false;
+        renderManagerTable(data);
+      })
+      .withFailureHandler(err => {
+        btn.innerText = "↻ Force Deep Sync";
+        btn.disabled = false;
+        customAlert(err.message);
+      })
+      .getManagerSummary(true);
+  }
+
   function goBack() {
     document.getElementById('dashboard-view').style.display = 'none'; document.getElementById('manager-view').style.display = 'none'; document.getElementById('admin-view').style.display = 'none';
     document.getElementById('login-view').style.display = 'flex'; document.getElementById('btn-back').style.display = 'none';
@@ -146,7 +184,38 @@
     }).saveDefaultStartDate(newDate);
   }
 
-  function fetchCsvHeaders() { const folderId = document.getElementById('drive-folder-id').value; if (!folderId) return customAlert("Need Folder ID"); const btn = document.getElementById('btn-fetch-csv'); btn.innerText = "Fetching..."; btn.disabled = true; google.script.run.withSuccessHandler(h => { btn.innerText = "Fetch Headers"; btn.disabled = false; let opts = `<option value="">-- Ignore --</option>` + h.map((head, i) => `<option value="${i}">${head}</option>`).join(''); document.getElementById('map-grid-items').innerHTML = REQUIRED_MAPPING_FIELDS.map(f => `<div class="map-field"><label>${f.label}</label><select id="${f.id}">${opts}</select></div>`).join(''); document.getElementById('mapping-container').style.display = 'block'; }).withFailureHandler(err => { btn.innerText = "Fetch Headers"; btn.disabled = false; customAlert(err.message); }).getHeadersFromCSVFolder(folderId); }
+  function fetchCsvHeaders() { 
+    const folderId = document.getElementById('drive-folder-id').value; 
+    if (!folderId) return customAlert("Need Folder ID"); 
+    const btn = document.getElementById('btn-fetch-csv'); 
+    btn.innerText = "Fetching..."; 
+    btn.disabled = true; 
+    console.log("1. Frontend sending request to backend for Folder ID:", folderId);
+
+    google.script.run
+      .withSuccessHandler(h => { 
+        console.log("2. Backend responded with success! Headers received:", h);
+        try {
+          btn.innerText = "Fetch Headers"; 
+          btn.disabled = false; 
+          let opts = `<option value="">-- Ignore --</option>` + h.map((head, i) => `<option value="${i}">${head}</option>`).join(''); 
+          document.getElementById('map-grid-items').innerHTML = REQUIRED_MAPPING_FIELDS.map(f => `<div class="map-field"><label>${f.label}</label><select id="${f.id}">${opts}</select></div>`).join(''); 
+          document.getElementById('mapping-container').style.display = 'block'; 
+          console.log("3. UI successfully rendered.");
+        } catch (renderError) {
+          console.error("❌ CRASH DURING RENDERING:", renderError);
+          customAlert("Failed to render the UI. Check browser console.");
+        }
+      })
+      .withFailureHandler(err => { 
+        console.error("❌ BACKEND CRASHED:", err);
+        btn.innerText = "Fetch Headers"; 
+        btn.disabled = false; 
+        customAlert("Backend Error: " + err.message); 
+      })
+      .getHeadersFromCSVFolder(folderId); 
+  }
+
   function fetchHierarchyHeaders() { const sId = document.getElementById('hier-sheet-id').value; const tName = document.getElementById('hier-tab-name').value; if(!sId || !tName) return customAlert("Need Sheet ID and Tab Name"); const btn = document.getElementById('btn-fetch-hier'); btn.innerText = "Loading..."; btn.disabled = true; google.script.run.withSuccessHandler(h => { btn.innerText = "Fetch Headers"; btn.disabled = false; let opts = `<option value="">-- Ignore --</option>` + h.map((head, i) => `<option value="${i}">${head}</option>`).join(''); document.getElementById('hier-grid-items').innerHTML = HIERARCHY_MAPPING_FIELDS.map(f => `<div class="map-field"><label>${f.label}</label><select id="${f.id}">${opts}</select></div>`).join(''); document.getElementById('hier-mapping-container').style.display = 'block'; }).withFailureHandler(err => { btn.innerText = "Fetch Headers"; btn.disabled = false; customAlert(err.message); }).getHeadersFromHierarchySheet(sId, tName); }
   function loadSegmentsFromCSV() { const payload = { csvFolderId: document.getElementById('drive-folder-id').value, csvMap: {} }; REQUIRED_MAPPING_FIELDS.forEach(f => { payload.csvMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : ""; }); if(!payload.csvFolderId || document.getElementById('map-grid-items').innerHTML === "") { return customAlert("Please complete Step 1 (CSV Ingestion & Mapping) first."); } const btn = document.getElementById('btn-load-segments'); btn.innerText = "Scanning CSVs..."; btn.disabled = true; google.script.run.withSuccessHandler(dims => { btn.innerText = "Segments Loaded!"; if (!dims) return; ['admin-seg1','admin-seg2','admin-seg3','admin-seg4','admin-seg5','admin-class'].forEach(id => { let key = id.replace('admin-',''); if(key==='class') key='classCode'; document.getElementById(id).innerHTML = `<option value="ALL">-- ALL --</option>` + dims[key].map(v => `<option value="${v}">${v}</option>`).join(''); }); document.getElementById('rules-grid-container').style.display = 'block'; }).withFailureHandler(err => { btn.innerText = "Load Segments from Mapped CSVs"; btn.disabled = false; customAlert(err.message); }).getCampaignDimensionsFromCSV(payload); }
   function addCampaignRule() { const pct = parseFloat(document.getElementById('admin-pct').value); if(isNaN(pct)) return customAlert("Valid % required."); CAMPAIGN_RULES.push({ seg1: document.getElementById('admin-seg1').value, seg2: document.getElementById('admin-seg2').value, seg3: document.getElementById('admin-seg3').value, seg4: document.getElementById('admin-seg4').value, seg5: document.getElementById('admin-seg5').value, classCode: document.getElementById('admin-class').value, pct: pct }); renderAdminRules(); }
