@@ -1,40 +1,345 @@
 /**
- * GLOBAL CONFIGURATION & UTILITIES
+ * DATA FETCHING & SAVING (API)
  */
 
-const COLORS = { PRIMARY: "#006272", ACCENT: "#ff8200", SECONDARY: "#4ec3e0", NEUTRAL: "#d0d0ce", NEGATIVE: "#a73321", POSITIVE: "#58b947", WHITE: "#ffffff" };
-
-function toJSONSafe(val, type) {
-  if (val === null || val === undefined) return type === 'number' ? 0 : "";
-  if (val instanceof Date) {
-    const year = val.getFullYear(); const month = String(val.getMonth() + 1).padStart(2, '0'); const day = String(val.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+function getAllUsers() {
+  try {
+    const dirSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Directory");
+    let defaultDate = PropertiesService.getScriptProperties().getProperty('DEFAULT_START_DATE') || "2026-02-25";
+    
+    if (!dirSheet) return {AE: [], SC: [], defaultDate: defaultDate};
+    const data = dirSheet.getDataRange().getValues();
+    const aeSet = new Set(); const scSet = new Set();
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0]) aeSet.add(String(data[i][0]).trim());
+      if (data[i][3]) scSet.add(String(data[i][3]).trim());
+    }
+    return { AE: [...aeSet].sort(), SC: [...scSet].sort(), defaultDate: defaultDate };
+  } catch (e) {
+    let fallback = PropertiesService.getScriptProperties().getProperty('DEFAULT_START_DATE') || "2026-02-25";
+    return {AE: [], SC: [], defaultDate: fallback};
   }
-  if (type === 'number') {
-    if (typeof val === 'number') return (isNaN(val) || !isFinite(val)) ? 0 : val;
-    const parsed = parseFloat(val);
-    return (isNaN(parsed) || !isFinite(parsed)) ? 0 : parsed;
-  }
-  return String(val).trim();
 }
 
-function ensureColumns(sheet, requiredCols) {
-  const currentCols = sheet.getMaxColumns();
-  if (currentCols < requiredCols) sheet.insertColumnsAfter(currentCols, requiredCols - currentCols);
+function getItemsForUser(selectedUser, role) {
+  try {
+    const dirSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Directory");
+    if (!dirSheet) return { items: [], portfolioStatus: "Not Submitted" };
+    
+    const dirData = dirSheet.getDataRange().getValues();
+    let filesToFetch = [];
+    let targetUser = String(selectedUser).trim().toLowerCase();
+
+    for (let i = 1; i < dirData.length; i++) {
+      if (role === 'SC' && String(dirData[i][3]).trim().toLowerCase() === targetUser) {
+        filesToFetch.push({ ae: String(dirData[i][0]).trim(), id: dirData[i][1] });
+      } else if ((role === 'AE' || role === 'MGR') && String(dirData[i][0]).trim().toLowerCase() === targetUser) {
+        filesToFetch.push({ ae: String(dirData[i][0]).trim(), id: dirData[i][1] });
+      }
+    }
+
+    if (filesToFetch.length === 0) return { items: [], portfolioStatus: "Not Submitted" };
+
+    const groups = {};
+    let statusSet = new Set();
+
+    filesToFetch.forEach(f => {
+      try {
+        const ss = SpreadsheetApp.openById(f.id);
+        const sheet = ss.getSheetByName("Sheet1");
+        if (!sheet) return;
+
+        ensureColumns(sheet, 40); 
+        const data = sheet.getDataRange().getValues(); 
+        if (data.length < 2) return;
+
+        let filePortfolioStatus = "Not Submitted";
+
+        for (let i = 1; i < data.length; i++) {
+          const row = data[i];
+          while (row.length < 40) row.push(""); 
+
+          let rowUser = String(row[24]).trim().toLowerCase();
+          if (rowUser !== f.ae.toLowerCase()) continue;
+          
+          let akVal = toJSONSafe(row[36], 'string');
+          if (akVal === "Pending Approval" || akVal === "Pending Manager Approval" || akVal === "Approved" || akVal === "Manager Rejected") filePortfolioStatus = akVal;
+          
+          const priceList = toJSONSafe(row[0], 'string'); const itemNum = toJSONSafe(row[2], 'string');
+          const uniqueKey = f.ae + "||" + priceList + "||" + itemNum;
+          const acctNum = toJSONSafe(row[23], 'string'); const acctName = toJSONSafe(row[26], 'string'); const classCode = toJSONSafe(row[27], 'string');
+          let impactStr = acctNum ? `<b>${acctNum}</b>${acctName ? ` - ${acctName}` : ''}${classCode ? ` , ${classCode}` : ''}` : "";
+
+          if (!groups[uniqueKey]) {
+            groups[uniqueKey] = {
+              key: uniqueKey, rowIds: [], priceList: priceList, itemNum: itemNum, desc: toJSONSafe(row[3], 'string'),
+              salesPerson: toJSONSafe(row[24], 'string'), currPrice: toJSONSafe(row[5], 'number'), suggPrice: toJSONSafe(row[28], 'number'),
+              estImpact: 0, qty: 0, volDisplay: toJSONSafe(row[20], 'string'), l12mSales: 0, l12mGP: 0,
+              finalPrice: (row[31] !== "" && row[31] !== null) ? toJSONSafe(row[31], 'number') : "",
+              status: toJSONSafe(row[33], 'string'), comment: toJSONSafe(row[34], 'string'), startDate: toJSONSafe(row[32], 'string'), impacts: []
+            };
+          }
+
+          groups[uniqueKey].rowIds.push(i + 1);
+          groups[uniqueKey].estImpact += toJSONSafe(row[29], 'number'); 
+          groups[uniqueKey].qty += toJSONSafe(row[20], 'number');
+          groups[uniqueKey].l12mSales += toJSONSafe(row[6], 'number');
+          groups[uniqueKey].l12mGP += toJSONSafe(row[7], 'number');
+          
+          if (impactStr && !groups[uniqueKey].impacts.includes(impactStr)) groups[uniqueKey].impacts.push(impactStr);
+          if (row[33] !== "" && groups[uniqueKey].status === "") groups[uniqueKey].status = toJSONSafe(row[33], 'string');
+          if (row[34] !== "" && groups[uniqueKey].comment === "") groups[uniqueKey].comment = toJSONSafe(row[34], 'string');
+          if (row[32] !== "" && groups[uniqueKey].startDate === "") groups[uniqueKey].startDate = toJSONSafe(row[32], 'string');
+        }
+        statusSet.add(filePortfolioStatus);
+      } catch (e) { }
+    });
+    
+    const results = Object.values(groups);
+    results.forEach(group => {
+      if (group.rowIds.length > 0) group.estImpact = group.estImpact / group.rowIds.length;
+      group.estImpact = toJSONSafe(group.estImpact, 'number'); group.currPrice = toJSONSafe(group.currPrice, 'number'); group.suggPrice = toJSONSafe(group.suggPrice, 'number'); group.qty = toJSONSafe(group.qty, 'number'); group.l12mSales = toJSONSafe(group.l12mSales, 'number'); group.l12mGP = toJSONSafe(group.l12mGP, 'number');
+    });
+
+    results.sort((a, b) => b.estImpact !== a.estImpact ? b.estImpact - a.estImpact : a.priceList.localeCompare(b.priceList));
+    
+    let finalPortStatus = "Not Submitted";
+    if (statusSet.has("Manager Rejected")) finalPortStatus = "Manager Rejected";
+    else if (statusSet.has("Pending Manager Approval") || statusSet.has("Pending Approval")) finalPortStatus = "Pending Manager Approval";
+    else if (statusSet.has("Approved")) finalPortStatus = "Approved";
+
+    return { items: results, portfolioStatus: finalPortStatus };
+  } catch (error) { throw new Error("Server Error: " + error.toString()); }
 }
 
-function saveDefaultStartDate(dateStr) {
-  PropertiesService.getScriptProperties().setProperty('DEFAULT_START_DATE', dateStr);
+function getManagerSummary(forceRefresh) {
+  try {
+    const dirSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Directory");
+    if (!dirSheet) return [];
+    const dirData = dirSheet.getDataRange().getValues();
+    if (dirData.length < 2) return [];
+
+    // OPTIMIZATION: Instant load from cached Directory tab if not forcing refresh
+    if (!forceRefresh && dirSheet.getLastColumn() >= 11) {
+       const managerAgg = {};
+       for (let d = 1; d < dirData.length; d++) {
+         let aeName = dirData[d][0];
+         if (!aeName) continue;
+         managerAgg[aeName] = {
+           aeName: aeName,
+           managerName: dirData[d][2],
+           portfolioStatus: dirData[d][4] || "Not Submitted",
+           total: dirData[d][5] || 0,
+           pending: dirData[d][6] || 0,
+           approved: dirData[d][7] || 0,
+           rejected: dirData[d][8] || 0,
+           estImpact: dirData[d][9] || 0,
+           realized: dirData[d][10] || 0
+         };
+       }
+       return Object.values(managerAgg).sort((a,b) => b.estImpact - a.estImpact);
+    }
+
+    // DEEP SCAN: Only runs on ETL execution or when the Manager clicks "Refresh"
+    if (dirSheet.getLastColumn() < 11) {
+       dirSheet.getRange(1, 6, 1, 6).setValues([["TOTAL_ITEMS", "PENDING", "APPROVED", "REJECTED", "EST_IMPACT", "REALIZED_IMPACT"]]).setFontWeight("bold").setBackground(COLORS.PRIMARY).setFontColor(COLORS.WHITE);
+    }
+
+    const managerAgg = {};
+    const dirUpdates = [];
+    
+    for (let d = 1; d < dirData.length; d++) {
+      let aeName = dirData[d][0];
+      let fileId = dirData[d][1];
+      let aeStats = { aeName: aeName, managerName: dirData[d][2], total: 0, pending: 0, approved: 0, rejected: 0, estImpact: 0, realized: 0, portfolioStatus: dirData[d][4] || "Not Submitted" };
+
+      if(fileId) {
+        try {
+          let ss = SpreadsheetApp.openById(fileId);
+          let sheet = ss.getSheetByName("Sheet1");
+          if(sheet) {
+            let data = sheet.getDataRange().getValues();
+            const groups = {};
+
+            for(let i = 1; i < data.length; i++) {
+              const row = data[i];
+              while (row.length < 40) row.push(""); 
+              
+              const priceList = toJSONSafe(row[0], 'string'); const itemNum = toJSONSafe(row[2], 'string');
+              const uniqueKey = priceList + "||" + itemNum;
+
+              if (!groups[uniqueKey]) {
+                groups[uniqueKey] = { rowIds: [], currPrice: toJSONSafe(row[5], 'number'), estImpact: 0, qty: 0, finalPrice: row[31] !== "" ? toJSONSafe(row[31], 'number') : "", status: toJSONSafe(row[33], 'string') || "PENDING" };
+              }
+              groups[uniqueKey].rowIds.push(i + 1);
+              groups[uniqueKey].estImpact += toJSONSafe(row[29], 'number');
+              groups[uniqueKey].qty += toJSONSafe(row[20], 'number');
+              if (row[33] !== "") groups[uniqueKey].status = toJSONSafe(row[33], 'string');
+              if (row[31] !== "") groups[uniqueKey].finalPrice = toJSONSafe(row[31], 'number');
+            }
+
+            Object.values(groups).forEach(g => {
+              if (g.rowIds.length > 0) g.estImpact = g.estImpact / g.rowIds.length;
+              aeStats.total++;
+              aeStats.estImpact += g.estImpact;
+              if (g.status === "APPROVED") {
+                aeStats.approved++;
+                if (g.finalPrice !== "") aeStats.realized += (g.finalPrice - g.currPrice) * g.qty;
+              } else if (g.status === "MODIFIED") { aeStats.approved++; if (g.finalPrice !== "") aeStats.realized += (g.finalPrice - g.currPrice) * g.qty; }
+              else if (g.status === "REJECTED") { aeStats.rejected++; } 
+              else aeStats.pending++;
+            });
+          }
+        } catch(e) { Logger.log("Could not process shard for: " + aeName); }
+      }
+
+      managerAgg[aeName] = aeStats;
+      dirUpdates.push([aeStats.total, aeStats.pending, aeStats.approved, aeStats.rejected, aeStats.estImpact, aeStats.realized]);
+    }
+
+    if(dirUpdates.length > 0) {
+        dirSheet.getRange(2, 6, dirUpdates.length, 6).setValues(dirUpdates);
+    }
+
+    return Object.values(managerAgg).sort((a,b) => b.estImpact - a.estImpact);
+  } catch (error) { throw new Error(error.toString()); }
+}
+
+function managerDecision(aeName, decision) {
+  try {
+      const dirSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Directory");
+      const dirData = dirSheet.getDataRange().getValues();
+      for(let i = 1; i < dirData.length; i++) {
+          if(String(dirData[i][0]).toLowerCase() === aeName.toLowerCase()) {
+              dirSheet.getRange(i+1, 5).setValue(decision); 
+              break;
+          }
+      }
+      
+      const fileId = getAeFileId(aeName);
+      const sheet = SpreadsheetApp.openById(fileId).getSheetByName("Sheet1");
+      const data = sheet.getDataRange().getValues();
+      const targetUser = aeName.toLowerCase();
+      const outVals = [];
+      
+      for(let i = 1; i < data.length; i++) {
+          let isTarget = String(data[i][24]).toLowerCase() === targetUser;
+          outVals.push([isTarget ? decision : data[i][36]]);
+      }
+      if(outVals.length > 0) sheet.getRange(2, 37, outVals.length, 1).setValues(outVals);
+      
+      return true;
+  } catch(e) { throw new Error(e.toString()); }
+}
+
+function submitPortfolio(userName, role) {
+  try {
+    const dirSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Directory");
+    const dirData = dirSheet.getDataRange().getValues();
+    let aeNames = [];
+    let targetUser = String(userName).trim().toLowerCase();
+
+    if(role === 'SC') {
+      for (let i = 1; i < dirData.length; i++) {
+        if (String(dirData[i][3]).trim().toLowerCase() === targetUser) aeNames.push(String(dirData[i][0]).trim());
+      }
+    } else {
+      aeNames.push(String(userName).trim());
+    }
+
+    if (dirSheet.getRange(1, 5).getValue() === "") {
+       dirSheet.getRange(1, 5).setValue("PORTFOLIO_STATUS").setFontWeight("bold").setBackground(COLORS.PRIMARY).setFontColor(COLORS.WHITE);
+    }
+
+    aeNames.forEach(aeName => {
+      const fileId = getAeFileId(aeName);
+      const sheet = SpreadsheetApp.openById(fileId).getSheetByName("Sheet1");
+      const data = sheet.getDataRange().getValues();
+      const tUser = aeName.toLowerCase();
+      
+      const outStatus = []; 
+      const outFinalPrice = []; 
+      const outPortfolioStatus = []; 
+
+      for (let i = 1; i < data.length; i++) {
+        while (data[i].length < 40) data[i].push("");
+        let isTargetUser = String(data[i][24]).toLowerCase() === tUser;
+        
+        let lineStatus = data[i][33];
+        let finalPrice = data[i][31];
+        
+        if (isTargetUser && (lineStatus === "" || lineStatus === "PENDING" || lineStatus === "Pending")) {
+          lineStatus = "APPROVED";
+          finalPrice = data[i][28]; 
+        }
+        
+        outStatus.push([lineStatus]);
+        outFinalPrice.push([finalPrice]);
+        outPortfolioStatus.push([isTargetUser ? "Pending Manager Approval" : data[i][36]]);
+      }
+      
+      if (data.length > 1) {
+        sheet.getRange(2, 34, outStatus.length, 1).setValues(outStatus);
+        sheet.getRange(2, 32, outFinalPrice.length, 1).setValues(outFinalPrice);
+        sheet.getRange(2, 37, outPortfolioStatus.length, 1).setValues(outPortfolioStatus);
+      }
+      
+      const updatedDirData = dirSheet.getDataRange().getValues();
+      for (let d = 1; d < updatedDirData.length; d++) {
+        if (String(updatedDirData[d][0]).trim().toLowerCase() === tUser) {
+          dirSheet.getRange(d + 1, 5).setValue("Pending Manager Approval");
+          break;
+        }
+      }
+    });
+
+    return true;
+  } catch (e) { throw new Error(e.toString()); }
+}
+
+function submitReview(updates) {
+  const byAe = {};
+  updates.forEach(u => {
+    let ae = String(u.aeName).trim();
+    if(!byAe[ae]) byAe[ae] = [];
+    byAe[ae].push(u);
+  });
+
+  for(let ae in byAe) {
+    const fileId = getAeFileId(ae);
+    const sheet = SpreadsheetApp.openById(fileId).getSheetByName("Sheet1");
+    byAe[ae].forEach(u => {
+      const ids = Array.isArray(u.rowIds) ? u.rowIds : [u.rowIds];
+      ids.forEach(id => {
+        if (u.decision) sheet.getRange(id, 34).setValue(u.decision);
+        if (u.finalPrice !== undefined && u.finalPrice !== "") { sheet.getRange(id, 32).setValue(u.finalPrice); } 
+        else if (u.decision === "REJECTED") { sheet.getRange(id, 32).setValue(u.currPrice); }
+        if (u.startDate) sheet.getRange(id, 33).setValue(u.startDate);
+        if (u.comment) sheet.getRange(id, 35).setValue(u.comment);
+      });
+    });
+  }
   return true;
 }
 
-function getAeFileId(aeName) {
-  const dirSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Directory");
-  if (!dirSheet) throw new Error("Directory tab not found. Admin must run the ETL pipeline first.");
-  const data = dirSheet.getDataRange().getValues();
-  const target = String(aeName).trim().toLowerCase();
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]).trim().toLowerCase() === target) return data[i][1];
-  }
-  throw new Error("No data file found for AE: " + aeName + ". Ensure they exist in the raw CSVs.");
+function getApprovedAccounts(selectedUser, role) {
+  try {
+    const fileId = getAeFileId(selectedUser);
+    const sheet = SpreadsheetApp.openById(fileId).getSheetByName("Sheet1");
+    const data = sheet.getDataRange().getValues();
+    const targetUser = toJSONSafe(selectedUser, 'string').toLowerCase();
+    const accts = {};
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i]; while (row.length < 40) row.push(""); 
+      let rowUser = role === 'SC' ? toJSONSafe(row[25], 'string').toLowerCase() : toJSONSafe(row[24], 'string').toLowerCase();
+      if (rowUser !== targetUser) continue;
+      if (toJSONSafe(row[33], 'string') !== "APPROVED") continue;
+      
+      const acctNum = toJSONSafe(row[23], 'string'); const acctName = toJSONSafe(row[26], 'string');
+      if (acctNum) accts[acctNum] = acctName || "Unknown Customer";
+    }
+    return Object.keys(accts).map(k => ({ num: k, name: accts[k] })).sort((a, b) => a.name.localeCompare(b.name));
+  } catch(e) { return []; }
 }
