@@ -565,8 +565,57 @@
   }
 
   function exportToExcel() {
-     let csvContent = "data:text/csv;charset=utf-8,Price List,Item Num,Description,AE Name,Est Impact,Qty,Previous Price,Current Price,Suggested Price,Final Price,Status,Comment\n";
-     ROW_DATA.forEach(row => { let rArray = [ `"${row.priceList}"`, `"${row.itemNum}"`, `"${row.desc}"`, `"${row.salesPerson}"`, row.estImpact, row.qty, row.prevPrice || "", row.currPrice, row.suggPrice, row.finalPrice || "", row.status, `"${row.comment}"`]; csvContent += rArray.join(",") + "\n"; });
-     const encodedUri = encodeURI(csvContent); const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", "BulkPack_Export.csv"); document.body.appendChild(link); link.click(); document.body.removeChild(link);
+     // Grab the current user's name for the file title
+     const user = document.getElementById('user-input').value || "User";
+     
+     // Show a loading alert so the user knows it's working
+     customAlert("Generating Google Sheet... This might take a few seconds depending on the data size.", "Exporting");
+
+     // Call the backend function
+     google.script.run
+       .withSuccessHandler(url => {
+         // Open the newly created Google Sheet in a new tab
+         window.open(url, '_blank');
+         
+         // Update the alert to give them a clickable link just in case their browser blocked the pop-up
+         customAlert(`Export complete! <br><br><a href="${url}" target="_blank" style="color:var(--primary); font-weight:bold;">Click here to open your Google Sheet</a>`, "Success");
+       })
+       .withFailureHandler(err => {
+         customAlert("Export Error: " + err.message, "Error");
+       })
+       .createExportSheet(ROW_DATA, user);
   }
-</script>
+
+ function runTheLoader() {
+    const folderId = prompt("Enter the Google Drive Folder ID containing the Shard files you want to screen:");
+    if (!folderId) return; // User cancelled
+
+    // 1. Show the built-in UI loading spinner
+    const loader = document.getElementById('initial-loader');
+    if(loader) loader.style.display = 'flex';
+    
+    // Update the button text to show it's working
+    const btn = document.getElementById('btn-run-loader');
+    if(btn) { btn.innerText = "Processing Files... Please Wait"; btn.disabled = true; }
+
+    // 2. Call the backend script
+    google.script.run
+      .withSuccessHandler(res => {
+        // Hide the loader and reset the button
+        if(loader) loader.style.display = 'none';
+        if(btn) { btn.innerText = "Run The Loader"; btn.disabled = false; }
+        
+        // Open the newly created Google Drive file in a new tab
+        window.open(res.url, '_blank');
+        
+        // Show a success message with a clickable link
+        customAlert(`Success! Screened ${res.count} files.<br><br>The CSV has been saved to your Google Drive.<br><br><a href="${res.url}" target="_blank" style="color:var(--primary); font-weight:bold; text-decoration:underline;">Click here to view your file</a>`, "Loader Complete");
+      })
+      .withFailureHandler(err => {
+        // Hide the loader and reset the button on error
+        if(loader) loader.style.display = 'none';
+        if(btn) { btn.innerText = "Run The Loader"; btn.disabled = false; }
+        customAlert("Failed to run The Loader: " + err.message, "Error");
+      })
+      .generateLoaderCSVFromFolder(folderId);
+  }
