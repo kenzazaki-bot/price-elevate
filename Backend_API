@@ -349,19 +349,26 @@ function getApprovedAccounts(selectedUser, role) {
 
 /**
  * Creates a new Google Sheet for the exported data.
- * @param {Array} exportData - The ROW_DATA array from the frontend.
+ * @param {String} safeDataString - The lightweight 2D array stringified from the frontend.
  * @param {String} userName - The name of the AE for the filename.
  * @returns {String} - The URL of the newly created Google Sheet.
  */
-function createExportSheet(exportData, userName) {
+function createExportSheet(safeDataString, userName) {
   try {
-    // 1. Create a new Google Sheet with a timestamped name
+    // 1. Parse the lightweight data array
+    const rows = JSON.parse(safeDataString);
+
+    if (!rows || rows.length === 0) {
+      throw new Error("No data found on the screen to export.");
+    }
+
+    // 2. Create the Google Sheet
     const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd_HH-mm");
     const ssName = "BulkPack_Export_" + userName + "_" + timestamp;
     const ss = SpreadsheetApp.create(ssName);
     const sheet = ss.getActiveSheet();
     
-    // 2. Define all the headers you want to export
+    // 3. Define headers
     const headers = [
       "Price List", "Item Num", "Description", "AE Name", 
       "L12M Qty", "L12M Sales $", "L12M GP $", "Start Date",
@@ -370,47 +377,17 @@ function createExportSheet(exportData, userName) {
       "Status", "Comment"
     ];
     
-    // 3. Map the frontend data into a 2D array matching the headers
-    const rows = exportData.map(row => {
-      // Calculate percentages to match the UI display
-      let suggPct = row.currPrice > 0 ? ((row.suggPrice - row.currPrice) / row.currPrice) : 0;
-      
-      let finalPriceVal = (row.finalPrice !== "" && row.finalPrice !== null) ? row.finalPrice : row.suggPrice;
-      let finalPct = (row.currPrice > 0 && finalPriceVal) ? ((finalPriceVal - row.currPrice) / row.currPrice) : "";
-      
-      return [
-        row.priceList,
-        row.itemNum,
-        row.desc,
-        row.salesPerson,
-        row.qty,
-        row.l12mSales,
-        row.l12mGP,
-        row.startDate,
-        row.prevPrice,
-        row.currPrice,
-        row.suggPrice,
-        suggPct,
-        row.estImpact,
-        row.finalPrice,
-        finalPct,
-        row.status,
-        row.comment
-      ];
-    });
-    
-    // 4. Combine headers and rows, then write to the sheet
+    // 4. Combine headers and rows, then paste to the sheet
     const fullData = [headers].concat(rows);
     sheet.getRange(1, 1, fullData.length, headers.length).setValues(fullData);
     
-    // 5. Apply basic styling (Header colors and percentage formatting)
+    // 5. Apply styling and formatting
     sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#00505c").setFontColor("white");
     sheet.getRange(2, 12, rows.length, 1).setNumberFormat("0.00%"); // Suggested %
     sheet.getRange(2, 15, rows.length, 1).setNumberFormat("0.00%"); // Final %
     sheet.getRange(2, 6, rows.length, 2).setNumberFormat("$#,##0.00"); // Sales and GP
     sheet.getRange(2, 9, rows.length, 3).setNumberFormat("$#,##0.00"); // Prices
     
-    // Auto-resize columns for better visibility
     sheet.autoResizeColumns(1, headers.length);
     
     return ss.getUrl();
