@@ -62,14 +62,23 @@
 
     const loader = document.getElementById('initial-loader');
     loader.style.display = 'flex';
+    
+ const loader = document.getElementById('initial-loader');
+    loader.style.display = 'flex';
+    
     google.script.run.withSuccessHandler(data => { 
-      USER_CACHE = data; 
-      DEFAULT_START_DATE = data.defaultDate || "2026-02-25";
-      if(document.getElementById('admin-default-date')) document.getElementById('admin-default-date').value = DEFAULT_START_DATE;
+        USER_CACHE = data; 
+        DEFAULT_START_DATE = data.defaultDate || "2026-02-25";
+        if(document.getElementById('admin-default-date')) document.getElementById('admin-default-date').value = DEFAULT_START_DATE;
 
-      if (PAGE_CONTEXT === 'manager') { start(); } else { switchRole(); }
-      loader.style.display = 'none'; 
-    }).getAllUsers();
+        if (PAGE_CONTEXT === 'manager') { start(); } else { switchRole(); }
+        loader.style.display = 'none'; 
+      })
+      .withFailureHandler(err => {
+        loader.style.display = 'none';
+        customAlert("Startup Error: Please authorize the script in the Apps Script Editor. Details: " + err.message, "App Blocked");
+      })
+      .getAllUsers();
     google.script.run.withSuccessHandler(b => { if(b){ document.getElementById('app-logo').src = b; document.getElementById('app-logo').style.display = 'block'; } }).getAppLogo(); 
   }
   
@@ -563,29 +572,52 @@
          google.script.run.withSuccessHandler(()=>{ customAlert("Portfolio Submitted!"); start(); }).submitPortfolio(user, role);
      });
   }
-
-  function exportToExcel() {
-     // Grab the current user's name for the file title
+function exportToExcel() {
      const user = document.getElementById('user-input').value || "User";
      
-     // Show a loading alert so the user knows it's working
-     customAlert("Generating Google Sheet... This might take a few seconds depending on the data size.", "Exporting");
+     customAlert("Preparing data for export... Please wait.", "Exporting");
 
-     // Call the backend function
+     // 1. COMPRESS THE DATA: Map only the fields we need into a lightweight 2D array
+     const exportRows = ROW_DATA.map(row => {
+        let suggPct = row.currPrice > 0 ? ((row.suggPrice - row.currPrice) / row.currPrice) : 0;
+        let finalPriceVal = (row.finalPrice !== "" && row.finalPrice !== null) ? row.finalPrice : row.suggPrice;
+        let finalPct = (row.currPrice > 0 && finalPriceVal) ? ((finalPriceVal - row.currPrice) / row.currPrice) : "";
+        
+        return [
+          row.priceList || "",
+          row.itemNum || "",
+          row.desc || "",
+          row.salesPerson || "",
+          row.qty || 0,
+          row.l12mSales || 0,
+          row.l12mGP || 0,
+          row.startDate || "",
+          row.prevPrice || 0,
+          row.currPrice || 0,
+          row.suggPrice || 0,
+          suggPct,
+          row.estImpact || 0,
+          finalPriceVal,
+          finalPct,
+          row.status || "",
+          row.comment || ""
+        ];
+     });
+
+     // 2. STRINGIFY: This is now a very small, safe string
+     const safeDataString = JSON.stringify(exportRows);
+
+     // 3. SEND TO BACKEND
      google.script.run
        .withSuccessHandler(url => {
-         // Open the newly created Google Sheet in a new tab
          window.open(url, '_blank');
-         
-         // Update the alert to give them a clickable link just in case their browser blocked the pop-up
          customAlert(`Export complete! <br><br><a href="${url}" target="_blank" style="color:var(--primary); font-weight:bold;">Click here to open your Google Sheet</a>`, "Success");
        })
        .withFailureHandler(err => {
          customAlert("Export Error: " + err.message, "Error");
        })
-       .createExportSheet(ROW_DATA, user);
+       .createExportSheet(safeDataString, user);
   }
-
  function runTheLoader() {
     const folderId = prompt("Enter the Google Drive Folder ID containing the Shard files you want to screen:");
     if (!folderId) return; // User cancelled
