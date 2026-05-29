@@ -68,8 +68,7 @@ function getItemsForUser(selectedUser, role) {
           const priceList = toJSONSafe(row[0], 'string'); const itemNum = toJSONSafe(row[2], 'string');
           const uniqueKey = f.ae + "||" + priceList + "||" + itemNum;
           const acctNum = toJSONSafe(row[23], 'string'); const acctName = toJSONSafe(row[26], 'string'); const classCode = toJSONSafe(row[27], 'string');
-          let impactStr = acctNum ?
-          `<b>${acctNum}</b>${acctName ? ` - ${acctName}` : ''}${classCode ? ` , ${classCode}` : ''}` : "";
+          let impactStr = acctNum ? `<b>${acctNum}</b>${acctName ? ` - ${acctName}` : ''}${classCode ? ` , ${classCode}` : ''}` : "";
           if (!groups[uniqueKey]) {
             groups[uniqueKey] = {
               key: uniqueKey, rowIds: [], priceList: priceList, itemNum: itemNum, desc: toJSONSafe(row[3], 'string'),
@@ -156,8 +155,7 @@ function getManagerSummary(forceRefresh) {
     for (let d = 1; d < dirData.length; d++) {
       let aeName = dirData[d][0];
       let fileId = dirData[d][1];
-      let aeStats = { aeName: aeName, managerName: dirData[d][2], total: 0, pending: 0, approved: 0, rejected: 0, estImpact: 0, realized: 0, portfolioStatus: dirData[d][4] ||
-      "Not Submitted" };
+      let aeStats = { aeName: aeName, managerName: dirData[d][2], total: 0, pending: 0, approved: 0, rejected: 0, estImpact: 0, realized: 0, portfolioStatus: dirData[d][4] || "Not Submitted" };
 
       if(fileId) {
         try {
@@ -175,8 +173,7 @@ function getManagerSummary(forceRefresh) {
               const uniqueKey = priceList + "||" + itemNum;
 
               if (!groups[uniqueKey]) {
-                groups[uniqueKey] = { rowIds: [], currPrice: toJSONSafe(row[5], 'number'), estImpact: 0, qty: 0, finalPrice: row[31] !== "" ?
-                toJSONSafe(row[31], 'number') : "", status: toJSONSafe(row[33], 'string') || "PENDING" };
+                groups[uniqueKey] = { rowIds: [], currPrice: toJSONSafe(row[5], 'number'), estImpact: 0, qty: 0, finalPrice: row[31] !== "" ? toJSONSafe(row[31], 'number') : "", status: toJSONSafe(row[33], 'string') || "PENDING" };
               }
               groups[uniqueKey].rowIds.push(i + 1);
               groups[uniqueKey].estImpact += toJSONSafe(row[29], 'number');
@@ -190,12 +187,10 @@ function getManagerSummary(forceRefresh) {
               aeStats.total++;
               aeStats.estImpact += g.estImpact;
               if (g.status === "APPROVED") {
-        
                 aeStats.approved++;
                 if (g.finalPrice !== "") aeStats.realized += (g.finalPrice - g.currPrice) * g.qty;
               } else if (g.status === "MODIFIED") { aeStats.approved++; if (g.finalPrice !== "") aeStats.realized += (g.finalPrice - g.currPrice) * g.qty; }
               else if (g.status === "REJECTED") { aeStats.rejected++; } 
-           
               else aeStats.pending++;
             });
           }
@@ -271,7 +266,6 @@ function submitPortfolio(userName, role) {
       const outPortfolioStatus = []; 
 
       for (let i = 1; i < data.length; i++) {
-       
         while (data[i].length < 40) data[i].push("");
         let isTargetUser = String(data[i][24]).toLowerCase() === tUser;
         
@@ -280,7 +274,6 @@ function submitPortfolio(userName, role) {
         
         if (isTargetUser && (lineStatus === "" || lineStatus === "PENDING" || lineStatus === "Pending")) {
           lineStatus = "APPROVED";
-          
           finalPrice = data[i][28]; 
         }
         
@@ -327,7 +320,6 @@ function submitReview(updates) {
         if (u.startDate) sheet.getRange(id, 33).setValue(u.startDate);
         if (u.comment) sheet.getRange(id, 35).setValue(u.comment);
       });
-  
     });
   }
   return true;
@@ -353,4 +345,76 @@ function getApprovedAccounts(selectedUser, role) {
     }
     return Object.keys(accts).map(k => ({ num: k, name: accts[k] })).sort((a, b) => a.name.localeCompare(b.name));
   } catch(e) { return []; }
+}
+
+/**
+ * Creates a new Google Sheet for the exported data.
+ * @param {Array} exportData - The ROW_DATA array from the frontend.
+ * @param {String} userName - The name of the AE for the filename.
+ * @returns {String} - The URL of the newly created Google Sheet.
+ */
+function createExportSheet(exportData, userName) {
+  try {
+    // 1. Create a new Google Sheet with a timestamped name
+    const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd_HH-mm");
+    const ssName = "BulkPack_Export_" + userName + "_" + timestamp;
+    const ss = SpreadsheetApp.create(ssName);
+    const sheet = ss.getActiveSheet();
+    
+    // 2. Define all the headers you want to export
+    const headers = [
+      "Price List", "Item Num", "Description", "AE Name", 
+      "L12M Qty", "L12M Sales $", "L12M GP $", "Start Date",
+      "Previous Price", "Current Price", "Suggested Price", 
+      "Suggested %", "Est Impact", "Final Price", "Final %", 
+      "Status", "Comment"
+    ];
+    
+    // 3. Map the frontend data into a 2D array matching the headers
+    const rows = exportData.map(row => {
+      // Calculate percentages to match the UI display
+      let suggPct = row.currPrice > 0 ? ((row.suggPrice - row.currPrice) / row.currPrice) : 0;
+      
+      let finalPriceVal = (row.finalPrice !== "" && row.finalPrice !== null) ? row.finalPrice : row.suggPrice;
+      let finalPct = (row.currPrice > 0 && finalPriceVal) ? ((finalPriceVal - row.currPrice) / row.currPrice) : "";
+      
+      return [
+        row.priceList,
+        row.itemNum,
+        row.desc,
+        row.salesPerson,
+        row.qty,
+        row.l12mSales,
+        row.l12mGP,
+        row.startDate,
+        row.prevPrice,
+        row.currPrice,
+        row.suggPrice,
+        suggPct,
+        row.estImpact,
+        row.finalPrice,
+        finalPct,
+        row.status,
+        row.comment
+      ];
+    });
+    
+    // 4. Combine headers and rows, then write to the sheet
+    const fullData = [headers].concat(rows);
+    sheet.getRange(1, 1, fullData.length, headers.length).setValues(fullData);
+    
+    // 5. Apply basic styling (Header colors and percentage formatting)
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#00505c").setFontColor("white");
+    sheet.getRange(2, 12, rows.length, 1).setNumberFormat("0.00%"); // Suggested %
+    sheet.getRange(2, 15, rows.length, 1).setNumberFormat("0.00%"); // Final %
+    sheet.getRange(2, 6, rows.length, 2).setNumberFormat("$#,##0.00"); // Sales and GP
+    sheet.getRange(2, 9, rows.length, 3).setNumberFormat("$#,##0.00"); // Prices
+    
+    // Auto-resize columns for better visibility
+    sheet.autoResizeColumns(1, headers.length);
+    
+    return ss.getUrl();
+  } catch (e) {
+    throw new Error("Failed to create export sheet: " + e.message);
+  }
 }
