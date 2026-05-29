@@ -301,3 +301,72 @@ function debugDriveFetch() {
     Logger.log("❌ FATAL CRASH: " + e.toString());
   }
 }
+/**
+ * THE LOADER: Screens all Google Sheets in a folder and extracts final pricing data.
+ * @param {String} folderId - The ID or URL of the folder containing the shard files.
+ * @returns {Object} - An object containing the URL of the new file and the number of files processed.
+ */
+function generateLoaderCSVFromFolder(folderId) {
+  try {
+    if (!folderId) throw new Error("Folder ID is required.");
+    
+    // Clean up the folder ID just in case the user pastes a full URL
+    if (folderId.includes('folders/')) folderId = folderId.split('folders/')[1].split('?')[0].split('/')[0];
+    
+    const folder = DriveApp.getFolderById(folderId);
+    const files = folder.getFilesByType(MimeType.GOOGLE_SHEETS);
+    
+    let csvData = [];
+    let fileCount = 0;
+    
+    // Add the CSV Header row
+    csvData.push(["Price List Name", "Item Number", "Final Price", "Final Start Date", "Status", "Manager Approval Status"].join(","));
+    
+    while (files.hasNext()) {
+      let file = files.next();
+      let ss = SpreadsheetApp.open(file);
+      let sheet = ss.getSheetByName("Sheet1"); 
+      if (!sheet) continue; 
+      
+      let data = sheet.getDataRange().getValues();
+      
+      // Loop through rows (skipping the header)
+      for (let i = 1; i < data.length; i++) {
+        let row = data[i];
+        while (row.length < 40) row.push("");
+        
+        let priceList = String(row[0] || "").trim();
+        let itemNum = String(row[2] || "").trim();
+        let finalPrice = row[31];
+        let startDate = row[32];
+        let status = String(row[33] || "").trim();
+        let mgrStatus = String(row[36] || "").trim();
+        
+        if (priceList && itemNum) {
+          // Format Date safely (YYYY-MM-DD)
+          if (startDate instanceof Date) {
+            let y = startDate.getFullYear();
+            let m = String(startDate.getMonth() + 1).padStart(2, '0');
+            let d = String(startDate.getDate()).padStart(2, '0');
+            startDate = `${y}-${m}-${d}`;
+          } else {
+            startDate = String(startDate || "").trim();
+          }
+          
+          csvData.push([`"${priceList}"`, `"${itemNum}"`, finalPrice, `"${startDate}"`, `"${status}"`, `"${mgrStatus}"`].join(","));
+        }
+      }
+      fileCount++;
+    }
+    
+    // Create the physical CSV file in the same Google Drive Folder
+    const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd_HHmm");
+    const fileName = "Price_to_Load_" + timestamp + ".csv";
+    const newFile = folder.createFile(fileName, csvData.join("\n"), MimeType.CSV);
+    
+    return { url: newFile.getUrl(), count: fileCount };
+    
+  } catch (e) {
+    throw new Error("Loader Error: " + e.message);
+  }
+}
