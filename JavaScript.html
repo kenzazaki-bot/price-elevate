@@ -1,12 +1,13 @@
 <script>
   let ROW_DATA = []; let PORTFOLIO_STATUS = "Not Submitted"; let USER_CACHE = { AE: [], SC: [] }; let CURRENT_LIST = []; 
   let CAMPAIGN_RULES = []; let pendingAction = null; let debounceTimer; let confirmCallback = null;
+  let currentSort = { col: null, asc: true }; // Tracks table sort state
 
   let DEFAULT_START_DATE = "2026-02-25";
 
   const REQUIRED_MAPPING_FIELDS = [
     { id: 'map_pl', label: 'Price List' }, { id: 'map_item', label: 'Item Number' }, { id: 'map_desc', label: 'Description' },
-    { id: 'map_price', label: 'Current Price' }, { id: 'map_vol', label: 'Volume (Qty)' }, { id: 'map_acct_num', label: 'Account Number' },
+    { id: 'map_price', label: 'Current Price' }, { id: 'map_prev_price', label: 'Previous Price' }, { id: 'map_vol', label: 'Volume (Qty)' }, { id: 'map_acct_num', label: 'Account Number' },
     { id: 'map_acct_name', label: 'Account Name' }, { id: 'map_ae', label: 'AE Name (Join Key)' }, { id: 'map_sc', label: 'SC Name (Fallback)' },
     { id: 'map_class', label: 'Class Code' }, { id: 'map_seg1', label: 'Segment 1' }, { id: 'map_seg2', label: 'Segment 2' },
     { id: 'map_seg3', label: 'Segment 3' }, { id: 'map_seg4', label: 'Segment 4' }, { id: 'map_seg5', label: 'Segment 5' },
@@ -18,7 +19,6 @@
     { id: 'hmap_mgr', label: 'Manager Name' }, { id: 'hmap_reg', label: 'Region' }, { id: 'hmap_email', label: 'AE Email' }
   ];
 
-  // --- CUSTOM UI ALERTS/CONFIRMS ---
   function customAlert(msg, title = "Notification") {
     document.getElementById('custom-modal-title').innerText = title;
     document.getElementById('custom-modal-msg').innerHTML = msg;
@@ -105,65 +105,56 @@
       document.getElementById('btn-back').style.display = 'none';
       document.getElementById('manager-view').style.display = 'block'; document.getElementById('current-user').innerText = `Manager View`;
       document.getElementById('manager-table-container').innerHTML = '<div class="loading" style="padding:20px; text-align:center; font-weight:bold;">Loading Manager Data (Fast Cache)...</div>';
-      
-      // OPTIMIZATION: Pass "false" to trigger the instant cache load
       google.script.run.withSuccessHandler(renderManagerTable).getManagerSummary(false);
     } else {
       const user = document.getElementById('user-input').value; if(!user) { document.getElementById('login-view').style.display = 'flex'; document.getElementById('btn-back').style.display = 'none'; return customAlert("Select user."); }
       document.getElementById('dashboard-view').style.display = 'block'; document.getElementById('current-user').innerText = `${role}: ${user}`;
-      
+      buildTableHeader();
+      google.script.run.withSuccessHandler(r => { ROW_DATA = r.items; PORTFOLIO_STATUS = r.portfolioStatus; renderTable(); }).withFailureHandler(err => { customAlert(err.message); goBack(); }).getItemsForUser(user, role);
+    }
+  }
+
+  function buildTableHeader() {
       document.getElementById('table-container').innerHTML = `
         <table id="main-data-table" style="min-width: 1500px;">
           <thead>
             <tr>
               <th width="2%" class="chk-cell"><input type="checkbox" id="master-chk" onclick="toggleAll(this)"></th>
-              <th width="7%">Price List <br><input type="text" class="filter-input" data-col="priceList" onkeyup="triggerFilter()"></th>
-              <th width="6%">Item # <br><input type="text" class="filter-input" data-col="itemNum" onkeyup="triggerFilter()"></th>
-              <th width="14%">Description <br><input type="text" class="filter-input" data-col="desc" onkeyup="triggerFilter()"></th>
-              <th width="6%">Acct Exec <br><input type="text" class="filter-input" data-col="salesPerson" onkeyup="triggerFilter()"></th>
-              <th width="4%">L12M Qty</th>
-              <th width="5%">L12M Sales $</th>
-              <th width="4%">L12M GP %</th>
-              <th width="8%">Start Date</th>
-              <th width="5%" class="col-price">Curr Price <br><input type="text" class="filter-input" data-col="currPrice" placeholder=">50" onkeyup="triggerFilter()"></th>
-              <th width="5%" class="col-price">Sugg Price</th>
-              <th width="4%" class="col-price">Sugg %</th>
-              <th width="6%" class="col-price">Est Imp</th>
-              <th width="6%" class="col-price">Final $</th>
-              <th width="5%" class="col-price">Final %</th>
-              <th width="6%">Status</th>
-              <th width="11%">Comments</th>
+              <th width="7%"><div class="sort-header" onclick="sortBy('priceList')">Price List <span class="sort-icon" id="sort-priceList"></span></div><input type="text" class="filter-input" data-col="priceList" onkeyup="triggerFilter()"></th>
+              <th width="6%"><div class="sort-header" onclick="sortBy('itemNum')">Item # <span class="sort-icon" id="sort-itemNum"></span></div><input type="text" class="filter-input" data-col="itemNum" onkeyup="triggerFilter()"></th>
+              <th width="14%"><div class="sort-header" onclick="sortBy('desc')">Description <span class="sort-icon" id="sort-desc"></span></div><input type="text" class="filter-input" data-col="desc" onkeyup="triggerFilter()"></th>
+              <th width="6%"><div class="sort-header" onclick="sortBy('salesPerson')">Acct Exec <span class="sort-icon" id="sort-salesPerson"></span></div><input type="text" class="filter-input" data-col="salesPerson" onkeyup="triggerFilter()"></th>
+              <th width="4%"><div class="sort-header" onclick="sortBy('qty')">L12M Qty <span class="sort-icon" id="sort-qty"></span></div><input type="text" class="filter-input" data-col="qty" placeholder=">100" onkeyup="triggerFilter()"></th>
+              <th width="5%"><div class="sort-header" onclick="sortBy('l12mSales')">L12M Sales$ <span class="sort-icon" id="sort-l12mSales"></span></div><input type="text" class="filter-input" data-col="l12mSales" placeholder=">500" onkeyup="triggerFilter()"></th>
+              <th width="4%"><div class="sort-header" onclick="sortBy('l12mGP_pct')">L12M GP% <span class="sort-icon" id="sort-l12mGP_pct"></span></div><input type="text" class="filter-input" data-col="l12mGP_pct" onkeyup="triggerFilter()"></th>
+              <th width="7%"><div class="sort-header" onclick="sortBy('startDate')">Start Date <span class="sort-icon" id="sort-startDate"></span></div><input type="date" class="filter-input" data-col="startDate" onchange="triggerFilter()"></th>
+              <th width="5%" class="col-price"><div class="sort-header" onclick="sortBy('prevPrice')">Prev $ <span class="sort-icon" id="sort-prevPrice"></span></div><input type="text" class="filter-input" data-col="prevPrice" onkeyup="triggerFilter()"></th>
+              <th width="5%" class="col-price"><div class="sort-header" onclick="sortBy('currPrice')">Curr $ <span class="sort-icon" id="sort-currPrice"></span></div><input type="text" class="filter-input" data-col="currPrice" placeholder=">50" onkeyup="triggerFilter()"></th>
+              <th width="5%" class="col-price"><div class="sort-header" onclick="sortBy('suggPrice')">Sugg $ <span class="sort-icon" id="sort-suggPrice"></span></div><input type="text" class="filter-input" data-col="suggPrice" onkeyup="triggerFilter()"></th>
+              <th width="4%" class="col-price"><div class="sort-header" onclick="sortBy('suggPct')">Sugg % <span class="sort-icon" id="sort-suggPct"></span></div><input type="text" class="filter-input" data-col="suggPct" onkeyup="triggerFilter()"></th>
+              <th width="5%" class="col-price"><div class="sort-header" onclick="sortBy('estImpact')">Est Imp <span class="sort-icon" id="sort-estImpact"></span></div><input type="text" class="filter-input" data-col="estImpact" onkeyup="triggerFilter()"></th>
+              <th width="6%" class="col-price"><div class="sort-header" onclick="sortBy('finalPrice')">Final $ <span class="sort-icon" id="sort-finalPrice"></span></div><input type="text" class="filter-input" data-col="finalPrice" onkeyup="triggerFilter()"></th>
+              <th width="5%" class="col-price"><div class="sort-header" onclick="sortBy('finalPct')">Final % <span class="sort-icon" id="sort-finalPct"></span></div><input type="text" class="filter-input" data-col="finalPct" onkeyup="triggerFilter()"></th>
+              <th width="5%"><div class="sort-header" onclick="sortBy('status')">Status <span class="sort-icon" id="sort-status"></span></div></th>
+              <th width="9%"><div class="sort-header" onclick="sortBy('comment')">Comments <span class="sort-icon" id="sort-comment"></span></div></th>
             </tr>
           </thead>
           <tbody id="table-body">
-            <tr><td colspan="17" style="text-align:center; padding:20px; color:#00505c; font-weight:bold;">Fetching Data from Secure Shard...</td></tr>
+            <tr><td colspan="18" style="text-align:center; padding:20px; color:#00505c; font-weight:bold;">Fetching Data from Secure Shard...</td></tr>
           </tbody>
         </table>
       `;
-
-      google.script.run.withSuccessHandler(r => { ROW_DATA = r.items; PORTFOLIO_STATUS = r.portfolioStatus; renderTable(); }).withFailureHandler(err => { customAlert(err.message); goBack(); }).getItemsForUser(user, role);
-    }
   }
 
-  // --- NEW: Manager Deep Sync Logic ---
   function refreshManagerData() {
     const btn = document.getElementById('btn-refresh-mgr');
     btn.innerText = "Syncing...";
     btn.disabled = true;
     document.getElementById('manager-table-container').innerHTML = '<div class="loading" style="padding:20px; text-align:center; font-weight:bold; color:var(--primary);">Deep scanning all AE files... This may take up to 30 seconds.</div>';
     
-    // Pass "true" to force the backend to open every spreadsheet and recalculate
     google.script.run
-      .withSuccessHandler(data => {
-        btn.innerText = "↻ Force Deep Sync";
-        btn.disabled = false;
-        renderManagerTable(data);
-      })
-      .withFailureHandler(err => {
-        btn.innerText = "↻ Force Deep Sync";
-        btn.disabled = false;
-        customAlert(err.message);
-      })
+      .withSuccessHandler(data => { btn.innerText = "↻ Force Deep Sync"; btn.disabled = false; renderManagerTable(data); })
+      .withFailureHandler(err => { btn.innerText = "↻ Force Deep Sync"; btn.disabled = false; customAlert(err.message); })
       .getManagerSummary(true);
   }
 
@@ -172,48 +163,18 @@
     document.getElementById('login-view').style.display = 'flex'; document.getElementById('btn-back').style.display = 'none';
   }
 
-  // --- ADMIN MAPPING ---
   function saveAdminSettings(btn) {
     const newDate = document.getElementById('admin-default-date').value;
     if(!newDate) return customAlert("Please select a valid date.");
     btn.innerText = "Saving...";
-    google.script.run.withSuccessHandler(() => {
-      DEFAULT_START_DATE = newDate;
-      btn.innerText = "Save Date";
-      customAlert("Default Start Date saved successfully.");
-    }).saveDefaultStartDate(newDate);
+    google.script.run.withSuccessHandler(() => { DEFAULT_START_DATE = newDate; btn.innerText = "Save Settings"; customAlert("Global settings saved successfully."); }).saveDefaultStartDate(newDate);
   }
 
   function fetchCsvHeaders() { 
     const folderId = document.getElementById('drive-folder-id').value; 
     if (!folderId) return customAlert("Need Folder ID"); 
-    const btn = document.getElementById('btn-fetch-csv'); 
-    btn.innerText = "Fetching..."; 
-    btn.disabled = true; 
-    console.log("1. Frontend sending request to backend for Folder ID:", folderId);
-
-    google.script.run
-      .withSuccessHandler(h => { 
-        console.log("2. Backend responded with success! Headers received:", h);
-        try {
-          btn.innerText = "Fetch Headers"; 
-          btn.disabled = false; 
-          let opts = `<option value="">-- Ignore --</option>` + h.map((head, i) => `<option value="${i}">${head}</option>`).join(''); 
-          document.getElementById('map-grid-items').innerHTML = REQUIRED_MAPPING_FIELDS.map(f => `<div class="map-field"><label>${f.label}</label><select id="${f.id}">${opts}</select></div>`).join(''); 
-          document.getElementById('mapping-container').style.display = 'block'; 
-          console.log("3. UI successfully rendered.");
-        } catch (renderError) {
-          console.error("❌ CRASH DURING RENDERING:", renderError);
-          customAlert("Failed to render the UI. Check browser console.");
-        }
-      })
-      .withFailureHandler(err => { 
-        console.error("❌ BACKEND CRASHED:", err);
-        btn.innerText = "Fetch Headers"; 
-        btn.disabled = false; 
-        customAlert("Backend Error: " + err.message); 
-      })
-      .getHeadersFromCSVFolder(folderId); 
+    const btn = document.getElementById('btn-fetch-csv'); btn.innerText = "Fetching..."; btn.disabled = true; 
+    google.script.run.withSuccessHandler(h => { try { btn.innerText = "Fetch Headers"; btn.disabled = false; let opts = `<option value="">-- Ignore --</option>` + h.map((head, i) => `<option value="${i}">${head}</option>`).join(''); document.getElementById('map-grid-items').innerHTML = REQUIRED_MAPPING_FIELDS.map(f => `<div class="map-field"><label>${f.label}</label><select id="${f.id}">${opts}</select></div>`).join(''); document.getElementById('mapping-container').style.display = 'block'; } catch (renderError) { customAlert("Failed to render the UI. Check browser console."); } }).withFailureHandler(err => { btn.innerText = "Fetch Headers"; btn.disabled = false; customAlert("Backend Error: " + err.message); }).getHeadersFromCSVFolder(folderId); 
   }
 
   function fetchHierarchyHeaders() { const sId = document.getElementById('hier-sheet-id').value; const tName = document.getElementById('hier-tab-name').value; if(!sId || !tName) return customAlert("Need Sheet ID and Tab Name"); const btn = document.getElementById('btn-fetch-hier'); btn.innerText = "Loading..."; btn.disabled = true; google.script.run.withSuccessHandler(h => { btn.innerText = "Fetch Headers"; btn.disabled = false; let opts = `<option value="">-- Ignore --</option>` + h.map((head, i) => `<option value="${i}">${head}</option>`).join(''); document.getElementById('hier-grid-items').innerHTML = HIERARCHY_MAPPING_FIELDS.map(f => `<div class="map-field"><label>${f.label}</label><select id="${f.id}">${opts}</select></div>`).join(''); document.getElementById('hier-mapping-container').style.display = 'block'; }).withFailureHandler(err => { btn.innerText = "Fetch Headers"; btn.disabled = false; customAlert(err.message); }).getHeadersFromHierarchySheet(sId, tName); }
@@ -224,7 +185,8 @@
   
   function executeFullPipeline() { 
     customConfirm("Are you sure? This will execute the Campaign ETL and write new Shard files per AE to Drive.", function() {
-      const payload = { csvFolderId: document.getElementById('drive-folder-id').value, csvMap: {}, hierSheetId: document.getElementById('hier-sheet-id').value, hierTab: document.getElementById('hier-tab-name').value, hierMap: {}, campaignRules: CAMPAIGN_RULES }; 
+      let campNameElem = document.getElementById('admin-campaign-name'); let campaignName = (campNameElem && campNameElem.value) ? campNameElem.value : "BulkPack";
+      const payload = { campaignName: campaignName, csvFolderId: document.getElementById('drive-folder-id').value, csvMap: {}, hierSheetId: document.getElementById('hier-sheet-id').value, hierTab: document.getElementById('hier-tab-name').value, hierMap: {}, campaignRules: CAMPAIGN_RULES }; 
       REQUIRED_MAPPING_FIELDS.forEach(f => payload.csvMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : ""); 
       if(payload.csvMap.map_ae === "") return customAlert("CSV Map: 'AE Name' is mandatory for Hub and Spoke routing."); 
       HIERARCHY_MAPPING_FIELDS.forEach(f => payload.hierMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : ""); 
@@ -234,8 +196,33 @@
     });
   }
 
-  // --- DASHBOARD LOGIC ---
   function formatDateForInput(dateStr) { if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr; return DEFAULT_START_DATE; }
+
+  // --- SORTING & FILTERING UTILITIES ---
+  function sortBy(col) {
+      if (currentSort.col === col) { currentSort.asc = !currentSort.asc; } 
+      else { currentSort.col = col; currentSort.asc = true; }
+      renderTable();
+  }
+
+  function updateSortIcons() {
+      document.querySelectorAll('.sort-icon').forEach(el => el.innerText = "");
+      if (currentSort.col) {
+          let iconEl = document.getElementById(`sort-${currentSort.col}`);
+          if (iconEl) iconEl.innerText = currentSort.asc ? " ▲" : " ▼";
+      }
+  }
+
+  function getColValue(row, col) {
+      if (col === 'suggPct') return row.currPrice > 0 ? ((row.suggPrice - row.currPrice) / row.currPrice) * 100 : 0;
+      if (col === 'finalPct') {
+          let fp = (row.finalPrice !== "" && row.finalPrice !== null) ? row.finalPrice : row.suggPrice;
+          return row.currPrice > 0 ? ((fp - row.currPrice) / row.currPrice) * 100 : 0;
+      }
+      if (col === 'l12mGP_pct') return row.l12mSales > 0 ? ((row.l12mGP / row.l12mSales) * 100) : 0;
+      if (col === 'finalPrice') return (row.finalPrice !== "" && row.finalPrice !== null) ? row.finalPrice : row.suggPrice;
+      return row[col] !== undefined && row[col] !== null ? row[col] : "";
+  }
 
   function renderTable() {
     const body = document.getElementById('table-body');
@@ -253,43 +240,72 @@
        document.getElementById('portfolio-status-badge').style.display = 'inline-block';
     } else {
        document.getElementById('master-chk').disabled = false;
-       
        if(document.querySelector('input[name="role"]:checked') && document.querySelector('input[name="role"]:checked').value === 'MGR'){
            document.getElementById('btn-submit-portfolio').style.display = 'none';
        } else {
            document.getElementById('btn-submit-portfolio').style.display = 'inline-block';
        }
-       
        if(PORTFOLIO_STATUS === "Manager Rejected") {
            document.getElementById('portfolio-status-badge').innerText = "Action Required: " + PORTFOLIO_STATUS;
            document.getElementById('portfolio-status-badge').style.display = 'inline-block';
-       } else {
-           document.getElementById('portfolio-status-badge').style.display = 'none';
-       }
+       } else { document.getElementById('portfolio-status-badge').style.display = 'none'; }
     }
 
-    const visibleItems = ROW_DATA.filter(row => {
+    const numericCols = ['qty', 'l12mSales', 'l12mGP_pct', 'prevPrice', 'currPrice', 'suggPrice', 'suggPct', 'estImpact', 'finalPrice', 'finalPct'];
+
+    let visibleItems = ROW_DATA.filter(row => {
         const status = row.status || "PENDING"; if (statusView !== 'ALL' && status !== statusView) return false;
+        
         for (let col in activeFilters) {
-          let filterVal = activeFilters[col]; let cellVal = row[col];
-          if (col === 'currPrice') {
-            const numVal = parseFloat(cellVal); const filterNum = parseFloat(filterVal.replace(/[<>=]/g, ''));
-            if (filterVal.startsWith('>=') && numVal < filterNum) return false;
-            else if (filterVal.startsWith('<=') && numVal > filterNum) return false;
-            else if (filterVal.startsWith('>') && numVal <= filterNum) return false;
-            else if (filterVal.startsWith('<') && numVal >= filterNum) return false;
-            else if (!filterVal.match(/[<>=]/) && !numVal.toString().includes(filterVal)) return false;
-          } else { let textVal = (cellVal || "").toString().toLowerCase(); if (!textVal.includes(filterVal)) return false; }
-        } return true;
+            let filterVal = activeFilters[col]; 
+            let cellVal = getColValue(row, col);
+
+            if (numericCols.includes(col)) {
+                let numVal = parseFloat(cellVal);
+                if (isNaN(numVal)) return false;
+                
+                let filterNumStr = filterVal.replace(/[<>=]/g, '').trim();
+                if (filterNumStr === "") continue; 
+
+                let filterNum = parseFloat(filterNumStr);
+                if (isNaN(filterNum)) continue;
+
+                if (filterVal.startsWith('>=')) { if(numVal < filterNum) return false; }
+                else if (filterVal.startsWith('<=')) { if(numVal > filterNum) return false; }
+                else if (filterVal.startsWith('>')) { if(numVal <= filterNum) return false; }
+                else if (filterVal.startsWith('<')) { if(numVal >= filterNum) return false; }
+                else if (!numVal.toString().includes(filterNumStr)) { return false; }
+            } else { 
+                let textVal = (cellVal || "").toString().toLowerCase(); 
+                if (!textVal.includes(filterVal)) return false; 
+            }
+        } 
+        return true;
     });
 
-    if(visibleItems.length === 0) { body.innerHTML = "<tr><td colspan='17' style='text-align:center; padding:20px; font-weight:bold; color:#a73321;'>✅ No Items Found matching filters</td></tr>"; document.getElementById('stats').innerText = "Showing 0 items"; return; }
+    // Deep sorting
+    if (currentSort.col) {
+        visibleItems.sort((a, b) => {
+            let valA = getColValue(a, currentSort.col);
+            let valB = getColValue(b, currentSort.col);
+            
+            if (typeof valA === 'string') valA = valA.toLowerCase();
+            if (typeof valB === 'string') valB = valB.toLowerCase();
+
+            if (valA < valB) return currentSort.asc ? -1 : 1;
+            if (valA > valB) return currentSort.asc ? 1 : -1;
+            return 0;
+        });
+    }
+
+    updateSortIcons();
+
+    if(visibleItems.length === 0) { body.innerHTML = "<tr><td colspan='18' style='text-align:center; padding:20px; font-weight:bold; color:#a73321;'>✅ No Items Found matching filters</td></tr>"; document.getElementById('stats').innerText = "Showing 0 items"; return; }
     updateTotals();
 
     let html = visibleItems.map((row) => {
       const index = ROW_DATA.indexOf(row);
       const status = row.status || "PENDING"; 
-      
       let badgeClass = "badge-pending";
       if (status === "APPROVED") badgeClass = "badge-approved";
       else if (status === "REJECTED") badgeClass = "badge-rejected";
@@ -318,10 +334,11 @@
           <td style="color:#555">${l12mSalesDisplay}</td>
           <td style="color:#555">${gpPct}</td>
           <td><input type="date" class="input-editable" style="font-family:'Roboto Mono', monospace;" value="${dateVal}" onchange="updateDate(${index}, this.value)" ${disabledAttr}></td>
-          <td class="col-price">$${row.currPrice.toFixed(2)}</td>
-          <td class="col-price sugg-price">$${row.suggPrice.toFixed(2)}</td>
+          <td class="col-price" style="color:#777;">$${(row.prevPrice || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+          <td class="col-price">$${(row.currPrice || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+          <td class="col-price sugg-price">$${(row.suggPrice || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
           <td class="col-price sugg-price">${suggPct}%</td>
-          <td class="col-price impact-val">$${row.estImpact.toFixed(2)}</td>
+          <td class="col-price impact-val">$${(row.estImpact || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
           <td class="col-price col-final"><input type="number" step="0.01" class="input-editable" style="font-family:'Roboto Mono', monospace;" value="${finalDisplay}" onchange="updateFinalPriceInline(${index}, this.value)" ${disabledAttr}></td>
           <td class="col-price"><input type="number" step="1" class="input-editable" style="font-family:'Roboto Mono', monospace;" value="${modPctVal}" onchange="updatePctInline(${index}, this.value)" ${disabledAttr}></td>
           <td><span id="badge-${index}" class="status-badge ${badgeClass}">${status}</span></td>
@@ -334,78 +351,33 @@
   }
 
   function autoDetermineStatus(item) {
-     let curr = parseFloat(item.currPrice);
-     let sugg = parseFloat(item.suggPrice);
-     let finalP = parseFloat(item.finalPrice);
-     let dDate = item.startDate || DEFAULT_START_DATE;
-
-     if (Math.abs(finalP - curr) < 0.01) {
-         item.finalPrice = curr; 
-         return "REJECTED";
-     } 
-     else if (Math.abs(finalP - sugg) < 0.01 && dDate === DEFAULT_START_DATE) {
-         return "APPROVED";
-     } 
-     else {
-         return "MODIFIED";
-     }
+     let curr = parseFloat(item.currPrice); let sugg = parseFloat(item.suggPrice); let finalP = parseFloat(item.finalPrice); let dDate = item.startDate || DEFAULT_START_DATE;
+     if (Math.abs(finalP - curr) < 0.01) { item.finalPrice = curr; return "REJECTED"; } 
+     else if (Math.abs(finalP - sugg) < 0.01 && dDate === DEFAULT_START_DATE) { return "APPROVED"; } 
+     else { return "MODIFIED"; }
   }
 
   function updateFinalPriceInline(index, priceStr) {
-    let item = ROW_DATA[index];
-    let price = parseFloat(priceStr);
-    if (isNaN(price)) return renderTable(); 
-    
-    if (price < item.currPrice) {
-        customAlert("Safeguard Alert: Final price cannot be set below the current price ($" + item.currPrice.toFixed(2) + ").");
-        return renderTable(); 
-    }
-
-    item.finalPrice = price;
-    item.status = autoDetermineStatus(item);
-    
-    if (item.status === "REJECTED" && !item.comment) {
-       openCommentModal('SINGLE', index);
-    } else {
-       decide(index, item.status, item.comment, item.finalPrice, item.startDate);
-    }
+    let item = ROW_DATA[index]; let price = parseFloat(priceStr); if (isNaN(price)) return renderTable(); 
+    price = Math.ceil(price * 100) / 100;
+    if (price < item.currPrice) { customAlert("Safeguard Alert: Final price cannot be set below the current price ($" + item.currPrice.toFixed(2) + ")."); return renderTable(); }
+    item.finalPrice = price; item.status = autoDetermineStatus(item);
+    if (item.status === "REJECTED" && !item.comment) { openCommentModal('SINGLE', index); } else { decide(index, item.status, item.comment, item.finalPrice, item.startDate); }
   }
 
   function updatePctInline(index, pctStr) {
-    let item = ROW_DATA[index];
-    let pct = parseInt(pctStr);
-    if (isNaN(pct)) return renderTable();
-    
-    let newPrice = item.currPrice * (1 + (pct / 100));
-    if (newPrice < item.currPrice) {
-        customAlert("Safeguard Alert: Final percentage cannot drop price below current. Percentage must be >= 0.");
-        return renderTable(); 
-    }
-
-    item.finalPrice = newPrice;
-    item.status = autoDetermineStatus(item);
-
-    if (item.status === "REJECTED" && !item.comment) {
-       openCommentModal('SINGLE', index);
-    } else {
-       decide(index, item.status, item.comment, item.finalPrice, item.startDate);
-    }
+    let item = ROW_DATA[index]; let pct = parseInt(pctStr); if (isNaN(pct)) return renderTable();
+    let newPrice = item.currPrice * (1 + (pct / 100)); newPrice = Math.ceil(newPrice * 100) / 100; 
+    if (newPrice < item.currPrice) { customAlert("Safeguard Alert: Final percentage cannot drop price below current. Percentage must be >= 0."); return renderTable(); }
+    item.finalPrice = newPrice; item.status = autoDetermineStatus(item);
+    if (item.status === "REJECTED" && !item.comment) { openCommentModal('SINGLE', index); } else { decide(index, item.status, item.comment, item.finalPrice, item.startDate); }
   }
 
   function updateDate(index, val) { 
-    let item = ROW_DATA[index];
-    item.startDate = val; 
-    if (!item.finalPrice) item.finalPrice = item.suggPrice;
-    item.status = autoDetermineStatus(item);
-    
-    decide(index, item.status, item.comment, item.finalPrice, item.startDate);
+    let item = ROW_DATA[index]; item.startDate = val; if (!item.finalPrice) item.finalPrice = item.suggPrice; item.status = autoDetermineStatus(item); decide(index, item.status, item.comment, item.finalPrice, item.startDate);
   }
-  
   function updateCommentInline(index, val) {
-    let item = ROW_DATA[index];
-    item.comment = val;
-    if (!item.finalPrice) item.finalPrice = item.suggPrice;
-    decide(index, item.status || 'PENDING', item.comment, item.finalPrice, item.startDate);
+    let item = ROW_DATA[index]; item.comment = val; if (!item.finalPrice) item.finalPrice = item.suggPrice; decide(index, item.status || 'PENDING', item.comment, item.finalPrice, item.startDate);
   }
 
   function updateTotals() {
@@ -419,39 +391,36 @@
     });
     document.getElementById('total-est').innerText = "$" + totalEst.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
     document.getElementById('total-real').innerText = "$" + totalReal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-    
-    if(PAGE_CONTEXT === 'manager'){
-        document.getElementById('mgr-total-est').innerText = document.getElementById('total-est').innerText;
-        document.getElementById('mgr-total-real').innerText = document.getElementById('total-real').innerText;
-    }
+    if(PAGE_CONTEXT === 'manager'){ document.getElementById('mgr-total-est').innerText = document.getElementById('total-est').innerText; document.getElementById('mgr-total-real').innerText = document.getElementById('total-real').innerText; }
   }
 
   function openCommentModal(type, index) { pendingAction = { type: type, index: index }; document.getElementById('modal-comment').value = ROW_DATA[index] ? ROW_DATA[index].comment || "" : ""; document.getElementById('comment-modal').style.display = 'block'; }
+  
+  function openBulkRejectModal() {
+      const selected = document.querySelectorAll('.row-chk:checked');
+      if (selected.length === 0) return customAlert("Select items first to Mass Reject.");
+      pendingAction = { type: 'BULK_ZERO', date: document.getElementById('bulk-date-input').value };
+      document.getElementById('modal-comment').value = "";
+      document.getElementById('comment-modal').style.display = 'block';
+  }
+
   function confirmRejection() { 
     const reason = document.getElementById('modal-comment').value.trim(); 
     if (!reason) return customAlert("Comment is required for 0% increases."); 
     
     if (pendingAction.type === 'SINGLE') { 
-       let item = ROW_DATA[pendingAction.index];
-       item.comment = reason;
-       decide(pendingAction.index, item.status, reason, item.finalPrice, item.startDate); 
+       let item = ROW_DATA[pendingAction.index]; item.comment = reason; decide(pendingAction.index, item.status, reason, item.finalPrice, item.startDate); 
     } else if (pendingAction.type === 'BULK_ZERO') {
-       const selected = document.querySelectorAll('.row-chk:checked');
-       const indicesToUpdate = [];
+       const selected = document.querySelectorAll('.row-chk:checked'); const indicesToUpdate = [];
        selected.forEach(chk => {
-         const idx = parseInt(chk.value);
-         const item = ROW_DATA[idx];
+         const idx = parseInt(chk.value); const item = ROW_DATA[idx];
          item.finalPrice = item.currPrice; // 0%
          item.comment = reason;
          if (pendingAction.date) item.startDate = pendingAction.date;
          if (!item.startDate) item.startDate = DEFAULT_START_DATE;
-         item.status = 'REJECTED';
-         indicesToUpdate.push(idx);
+         item.status = 'REJECTED'; indicesToUpdate.push(idx);
        });
-       renderTable();
-       document.getElementById('master-chk').checked = false;
-       document.getElementById('bulk-bar').style.display = 'none';
-
+       renderTable(); document.getElementById('master-chk').checked = false; document.getElementById('bulk-bar').style.display = 'none';
        const bulkPayload = indicesToUpdate.map(idx => ({ rowIds: ROW_DATA[idx].rowIds, decision: ROW_DATA[idx].status, finalPrice: ROW_DATA[idx].finalPrice, comment: ROW_DATA[idx].comment, startDate: ROW_DATA[idx].startDate, aeName: ROW_DATA[idx].salesPerson }));
        google.script.run.submitReview(bulkPayload);
     }
@@ -461,54 +430,55 @@
 
   function bulkApply() {
     const pctStr = document.getElementById('bulk-pct-input').value;
+    const valStr = document.getElementById('bulk-val-input').value;
     const dateVal = document.getElementById('bulk-date-input').value;
     
-    if (!pctStr && !dateVal) return customAlert("Please enter a % or select a date to apply updates.");
+    if (!pctStr && !valStr && !dateVal) return customAlert("Please enter a %, a $ Value, or select a date.");
     
     const selected = document.querySelectorAll('.row-chk:checked');
     if (selected.length === 0) return customAlert("Select items first.");
     
-    let pct = NaN;
+    let pct = NaN; let flatVal = NaN;
+
     if (pctStr !== "") {
         pct = parseInt(pctStr);
-        if (isNaN(pct) || pct < 0) return customAlert("Please enter a valid percentage >= 0.");
+        if (isNaN(pct) || pct < 0) return customAlert("Valid % >= 0 required.");
         if (pct === 0) {
-            pendingAction = { type: 'BULK_ZERO', date: dateVal };
-            document.getElementById('modal-comment').value = "";
-            document.getElementById('comment-modal').style.display = 'block';
-            return;
+            pendingAction = { type: 'BULK_ZERO', date: dateVal }; document.getElementById('modal-comment').value = ""; document.getElementById('comment-modal').style.display = 'block'; return;
         }
+    } else if (valStr !== "") {
+        flatVal = parseFloat(valStr);
+        if (isNaN(flatVal) || flatVal < 0) return customAlert("Valid $ Value >= 0 required.");
     }
     
     const indicesToUpdate = [];
     selected.forEach(chk => {
-      const idx = parseInt(chk.value); 
-      const item = ROW_DATA[idx];
+      const idx = parseInt(chk.value); const item = ROW_DATA[idx];
       
-      if (!isNaN(pct)) {
-          item.finalPrice = item.currPrice * (1 + (pct / 100));
+      if (!isNaN(flatVal)) {
+          item.finalPrice = Math.ceil(flatVal * 100) / 100;
+      } else if (!isNaN(pct)) {
+          let calculatedPrice = item.currPrice * (1 + (pct / 100));
+          item.finalPrice = Math.ceil(calculatedPrice * 100) / 100; 
       }
-      if (dateVal) {
-          item.startDate = dateVal;
-      }
+      
+      // Safeguard
+      if (item.finalPrice < item.currPrice) { item.finalPrice = item.currPrice; }
+      
+      if (dateVal) { item.startDate = dateVal; }
       if(!item.startDate) item.startDate = DEFAULT_START_DATE;
       if(!item.finalPrice) item.finalPrice = item.suggPrice;
       
-      item.status = autoDetermineStatus(item);
-      indicesToUpdate.push(idx);
+      item.status = autoDetermineStatus(item); indicesToUpdate.push(idx);
     });
     
-    renderTable(); 
-    document.getElementById('master-chk').checked = false; 
-    document.getElementById('bulk-bar').style.display = 'none';
-    
+    renderTable(); document.getElementById('master-chk').checked = false; document.getElementById('bulk-bar').style.display = 'none';
     const bulkPayload = indicesToUpdate.map(idx => ({ rowIds: ROW_DATA[idx].rowIds, decision: ROW_DATA[idx].status, finalPrice: ROW_DATA[idx].finalPrice, comment: ROW_DATA[idx].comment, startDate: ROW_DATA[idx].startDate, aeName: ROW_DATA[idx].salesPerson }));
     google.script.run.submitReview(bulkPayload);
   }
 
   function bulkDecide(decision, comment="") {
-    const selected = document.querySelectorAll('.row-chk:checked'); if (selected.length === 0) return;
-    const indicesToUpdate = [];
+    const selected = document.querySelectorAll('.row-chk:checked'); if (selected.length === 0) return; const indicesToUpdate = [];
     selected.forEach(chk => {
       const idx = parseInt(chk.value); indicesToUpdate.push(idx); const item = ROW_DATA[idx];
       if (decision === 'APPROVED') { if(!item.finalPrice) item.finalPrice = item.suggPrice; } else item.finalPrice = "";
@@ -521,9 +491,7 @@
 
   function decide(index, decision, comment="", price=null, date="") {
     const item = ROW_DATA[index]; item.status = decision; if (comment) item.comment = comment; if (price !== null) item.finalPrice = price; if (date) item.startDate = date; 
-    renderTable();
-    const payload = [{ rowIds: item.rowIds, decision: decision, finalPrice: item.finalPrice, comment: item.comment, startDate: item.startDate, aeName: item.salesPerson }];
-    google.script.run.submitReview(payload);
+    renderTable(); const payload = [{ rowIds: item.rowIds, decision: decision, finalPrice: item.finalPrice, comment: item.comment, startDate: item.startDate, aeName: item.salesPerson }]; google.script.run.submitReview(payload);
   }
 
   function toggleAll(master) { document.querySelectorAll('.row-chk').forEach(chk => chk.checked = master.checked); updateBulkBar(); }
@@ -532,42 +500,43 @@
   function clearAllFilters() { document.querySelectorAll('.filter-input').forEach(input => input.value = ""); document.getElementById('status-filter').value = "ALL"; renderTable(); }
 
   function renderManagerTable(data) {
-     const mgrGroups = {};
-     let totalRegEst = 0;
-     let totalRegReal = 0;
-
-     data.forEach(r => {
-         let mName = r.managerName || 'Unassigned';
-         if(!mgrGroups[mName]) mgrGroups[mName] = [];
-         mgrGroups[mName].push(r);
-         totalRegEst += r.estImpact;
-         totalRegReal += r.realized;
-     });
-
+     const mgrGroups = {}; let totalRegEst = 0; let totalRegReal = 0;
+     data.forEach(r => { let mName = r.managerName || 'Unassigned'; if(!mgrGroups[mName]) mgrGroups[mName] = []; mgrGroups[mName].push(r); totalRegEst += r.estImpact; totalRegReal += r.realized; });
      document.getElementById('mgr-total-est').innerText = "$" + totalRegEst.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
      document.getElementById('mgr-total-real').innerText = "$" + totalRegReal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
      let html = "";
      for(let mgr in mgrGroups) {
-         html += `<h3 style="color:var(--primary); margin-top:25px; border-bottom: 2px solid var(--info); padding-bottom: 5px;">Manager: ${mgr}</h3>`;
-         html += `<table><thead><tr><th>AE Name</th><th>Total Items</th><th>Pending</th><th>Approved/Mod</th><th>Est Impact</th><th>Realized Impact</th><th>Status</th><th>Actions</th></tr></thead><tbody>`;
+         let subTotalItems = 0, subPending = 0, subApproved = 0, subRejected = 0, subEst = 0, subReal = 0;
+         mgrGroups[mgr].forEach(row => { subTotalItems += row.total || 0; subPending += row.pending || 0; subApproved += row.approved || 0; subRejected += row.rejected || 0; subEst += row.estImpact || 0; subReal += row.realized || 0; });
+
+         html += `<h3 style="color:var(--primary); margin-top:25px; border-bottom: 2px solid var(--info); padding-bottom: 5px; display:flex; justify-content:space-between; align-items:center;">
+                     <span>Manager: ${mgr}</span>
+                     <span style="font-size:1rem; color:var(--accent);">Subtotal Est Impact: $${subEst.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                  </h3>`;
+                  
+         html += `<table><thead><tr><th>AE Name</th><th>Total Items</th><th>Pending</th><th>Approved/Mod</th><th>Rejected</th><th>Est Impact</th><th>Realized Impact</th><th>Status</th><th>Actions</th></tr></thead><tbody>`;
          
          mgrGroups[mgr].forEach(row => {
              let badgeColor = row.portfolioStatus === "Approved" ? "badge-approved" : (row.portfolioStatus === "Pending Manager Approval" ? "badge-frozen" : "badge-pending");
              let actionBtns = "";
-             
              if(row.portfolioStatus === "Pending Manager Approval") {
                  actionBtns = `<button class="btn-export" style="background:var(--pos); padding:4px 10px; margin-right: 5px;" onclick="managerAction('${row.aeName}', 'Approved')">Approve</button>
                                <button class="btn-export" style="background:var(--neg); padding:4px 10px;" onclick="managerAction('${row.aeName}', 'Manager Rejected')">Reject</button>`;
              }
-
              html += `<tr>
                  <td><span style="font-weight:bold; color:var(--info); cursor:pointer; text-decoration:underline;" onclick="loadAEViewAsManager('${row.aeName}')">${row.aeName}</span></td>
-                 <td>${row.total}</td><td>${row.pending}</td><td>${row.approved}</td><td class="val-est">$${row.estImpact.toFixed(2)}</td><td class="val-real">$${row.realized.toFixed(2)}</td><td><span class="status-badge ${badgeColor}">${row.portfolioStatus}</span></td>
-                 <td>${actionBtns}</td>
+                 <td>${(row.total || 0).toLocaleString()}</td><td>${(row.pending || 0).toLocaleString()}</td><td>${(row.approved || 0).toLocaleString()}</td><td>${(row.rejected || 0).toLocaleString()}</td>
+                 <td class="val-est">$${(row.estImpact || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td><td class="val-real">$${(row.realized || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                 <td><span class="status-badge ${badgeColor}">${row.portfolioStatus}</span></td><td>${actionBtns}</td>
              </tr>`;
          });
-         html += `</tbody></table>`;
+         
+         html += `<tr style="background-color: #f1f8f9; font-weight: bold; border-top: 2px solid var(--primary);">
+                     <td>SUBTOTAL</td><td>${subTotalItems.toLocaleString()}</td><td>${subPending.toLocaleString()}</td><td>${subApproved.toLocaleString()}</td><td>${subRejected.toLocaleString()}</td>
+                     <td class="val-est">$${subEst.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td><td class="val-real">$${subReal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                     <td colspan="2"></td>
+                  </tr></tbody></table>`;
      }
      document.getElementById('manager-table-container').innerHTML = html;
   }
@@ -575,81 +544,29 @@
   function managerAction(aeName, decision) {
      let msg = decision === 'Approved' ? `Approve ${aeName}'s portfolio?` : `Reject ${aeName}'s portfolio? They will be able to edit it again.`;
      customConfirm(msg, function() {
-         const loader = document.getElementById('initial-loader');
-         loader.style.display = 'flex';
-         google.script.run.withSuccessHandler(() => {
-             loader.style.display = 'none';
-             customAlert(`Portfolio for ${aeName} has been ${decision === 'Approved' ? 'Approved' : 'Rejected'}.`);
-             start(); 
-         }).withFailureHandler(e => {
-             loader.style.display = 'none';
-             customAlert("Error: " + e.message);
-         }).managerDecision(aeName, decision);
+         const loader = document.getElementById('initial-loader'); loader.style.display = 'flex';
+         google.script.run.withSuccessHandler(() => { loader.style.display = 'none'; customAlert(`Portfolio for ${aeName} has been ${decision === 'Approved' ? 'Approved' : 'Rejected'}.`); start(); }).withFailureHandler(e => { loader.style.display = 'none'; customAlert("Error: " + e.message); }).managerDecision(aeName, decision);
      });
   }
 
   function loadAEViewAsManager(aeName) {
-     document.getElementById('manager-view').style.display = 'none';
-     document.getElementById('dashboard-view').style.display = 'block';
-     document.getElementById('current-user').innerText = `Manager Viewing: ${aeName}`;
-     document.getElementById('user-input').value = aeName; 
-     
+     document.getElementById('manager-view').style.display = 'none'; document.getElementById('dashboard-view').style.display = 'block'; document.getElementById('current-user').innerText = `Manager Viewing: ${aeName}`; document.getElementById('user-input').value = aeName; 
      document.getElementById('btn-back').style.display = 'block';
-     document.getElementById('btn-back').onclick = function() {
-         document.getElementById('dashboard-view').style.display = 'none';
-         document.getElementById('manager-view').style.display = 'block';
-         document.getElementById('current-user').innerText = `Manager View`;
-         document.getElementById('btn-back').style.display = 'none'; 
-         start(); 
-     };
-
-     document.getElementById('table-container').innerHTML = `
-        <table id="main-data-table" style="min-width: 1500px;">
-          <thead>
-            <tr>
-              <th width="2%" class="chk-cell"><input type="checkbox" id="master-chk" onclick="toggleAll(this)"></th>
-              <th width="7%">Price List <br><input type="text" class="filter-input" data-col="priceList" onkeyup="triggerFilter()"></th>
-              <th width="6%">Item # <br><input type="text" class="filter-input" data-col="itemNum" onkeyup="triggerFilter()"></th>
-              <th width="14%">Description <br><input type="text" class="filter-input" data-col="desc" onkeyup="triggerFilter()"></th>
-              <th width="6%">Acct Exec <br><input type="text" class="filter-input" data-col="salesPerson" onkeyup="triggerFilter()"></th>
-              <th width="4%">L12M Qty</th>
-              <th width="5%">L12M Sales $</th>
-              <th width="4%">L12M GP %</th>
-              <th width="8%">Start Date</th>
-              <th width="5%" class="col-price">Curr Price <br><input type="text" class="filter-input" data-col="currPrice" placeholder=">50" onkeyup="triggerFilter()"></th>
-              <th width="5%" class="col-price">Sugg Price</th>
-              <th width="4%" class="col-price">Sugg %</th>
-              <th width="6%" class="col-price">Est Imp</th>
-              <th width="6%" class="col-price">Final $</th>
-              <th width="5%" class="col-price">Final %</th>
-              <th width="6%">Status</th>
-              <th width="11%">Comments</th>
-            </tr>
-          </thead>
-          <tbody id="table-body">
-            <tr><td colspan="17" style="text-align:center; padding:20px; color:#00505c; font-weight:bold;">Fetching Data from Secure Shard...</td></tr>
-          </tbody>
-        </table>
-     `;
-     
+     document.getElementById('btn-back').onclick = function() { document.getElementById('dashboard-view').style.display = 'none'; document.getElementById('manager-view').style.display = 'block'; document.getElementById('current-user').innerText = `Manager View`; document.getElementById('btn-back').style.display = 'none'; start(); };
+     buildTableHeader();
      google.script.run.withSuccessHandler(r => { ROW_DATA = r.items; PORTFOLIO_STATUS = r.portfolioStatus; renderTable(); }).withFailureHandler(err => { customAlert(err.message); start(); }).getItemsForUser(aeName, 'MGR');
   }
 
   function submitPortfolioAE() {
      customConfirm("Are you sure you want to submit your portfolio for Manager review?", function() {
-         const user = document.getElementById('user-input').value;
-         const roleElement = document.querySelector('input[name="role"]:checked');
-         const role = roleElement ? roleElement.value : (PAGE_CONTEXT === 'manager' ? 'MGR' : 'AE');
+         const user = document.getElementById('user-input').value; const roleElement = document.querySelector('input[name="role"]:checked'); const role = roleElement ? roleElement.value : (PAGE_CONTEXT === 'manager' ? 'MGR' : 'AE');
          google.script.run.withSuccessHandler(()=>{ customAlert("Portfolio Submitted!"); start(); }).submitPortfolio(user, role);
      });
   }
 
   function exportToExcel() {
-     let csvContent = "data:text/csv;charset=utf-8,Price List,Item Num,Description,AE Name,Est Impact,Qty,Current Price,Suggested Price,Final Price,Status,Comment\n";
-     ROW_DATA.forEach(row => {
-         let rArray = [ `"${row.priceList}"`, `"${row.itemNum}"`, `"${row.desc}"`, `"${row.salesPerson}"`, row.estImpact, row.qty, row.currPrice, row.suggPrice, row.finalPrice || "", row.status, `"${row.comment}"`];
-         csvContent += rArray.join(",") + "\n";
-     });
+     let csvContent = "data:text/csv;charset=utf-8,Price List,Item Num,Description,AE Name,Est Impact,Qty,Previous Price,Current Price,Suggested Price,Final Price,Status,Comment\n";
+     ROW_DATA.forEach(row => { let rArray = [ `"${row.priceList}"`, `"${row.itemNum}"`, `"${row.desc}"`, `"${row.salesPerson}"`, row.estImpact, row.qty, row.prevPrice || "", row.currPrice, row.suggPrice, row.finalPrice || "", row.status, `"${row.comment}"`]; csvContent += rArray.join(",") + "\n"; });
      const encodedUri = encodeURI(csvContent); const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", "BulkPack_Export.csv"); document.body.appendChild(link); link.click(); document.body.removeChild(link);
   }
 </script>
