@@ -36,10 +36,15 @@
   
   table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; table-layout: fixed; margin-bottom: 20px; }
   thead { background: var(--primary); color: white; }
-  th { padding: 10px; text-align: left; font-size: 0.75rem; text-transform: uppercase; vertical-align: top; }
+  th { padding: 8px; text-align: left; font-size: 0.75rem; text-transform: uppercase; vertical-align: top; }
   td { padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 0.85rem; vertical-align: middle; overflow-wrap: break-word; }
-  .filter-input { width: 90%; padding: 4px; margin-top: 5px; font-size: 0.75rem; border: 1px solid #ccc; border-radius: 3px; }
+  .filter-input { width: 100%; box-sizing: border-box; padding: 4px; margin-top: 5px; font-size: 0.75rem; border: 1px solid #ccc; border-radius: 3px; }
   
+  /* Sort Headers */
+  .sort-header { cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; padding-bottom: 2px; }
+  .sort-header:hover { text-decoration: underline; }
+  .sort-icon { font-size: 0.7rem; color: var(--accent); margin-left: 2px; }
+
   .input-editable { background-color: #e1f5fe; border: 1px solid #0288d1; border-radius: 3px; padding: 4px; font-family: 'Roboto', sans-serif; width: 100%; box-sizing: border-box; }
   .input-editable:focus { outline: 2px solid var(--accent); background-color: white; }
   .input-editable:disabled { background-color: #f1f1f1; border: 1px solid #ddd; color: #888; cursor: not-allowed; }
