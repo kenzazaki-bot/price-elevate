@@ -4,6 +4,7 @@
   let currentSort = { col: null, asc: true }; // Tracks table sort state
 
   let DEFAULT_START_DATE = "2026-02-25";
+  alert("Hello! The JavaScript file is working!");
 
   const REQUIRED_MAPPING_FIELDS = [
     { id: 'map_pl', label: 'Price List' }, { id: 'map_item', label: 'Item Number' }, { id: 'map_desc', label: 'Description' },
@@ -44,9 +45,16 @@
     document.getElementById('custom-modal-overlay').style.display = 'flex';
   }
 
+  // Check if the browser already finished loading. If yes, run immediately. If not, wait for it.
+if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initData);
-
-  function initData() {
+} else {
+  initData();
+}
+  
+function initData() {
+  console.log("TEST 1: initData has started!"); // Add this line!
+    
     const container = document.getElementById('role-container');
     if (PAGE_CONTEXT === 'admin') {
         document.getElementById('login-title').innerText = "Admin Access";
@@ -60,10 +68,8 @@
         container.innerHTML = '<label><input type="radio" name="role" value="AE" checked onchange="switchRole()"><span>Account Exec</span></label>';
     }
 
+    // Grab the loader and display it (Removed the duplicate declaration here)
     const loader = document.getElementById('initial-loader');
-    loader.style.display = 'flex';
-    
- const loader = document.getElementById('initial-loader');
     loader.style.display = 'flex';
     
     google.script.run.withSuccessHandler(data => { 
@@ -72,6 +78,8 @@
         if(document.getElementById('admin-default-date')) document.getElementById('admin-default-date').value = DEFAULT_START_DATE;
 
         if (PAGE_CONTEXT === 'manager') { start(); } else { switchRole(); }
+        
+        // Hide the loader once data is successfully fetched
         loader.style.display = 'none'; 
       })
       .withFailureHandler(err => {
@@ -79,7 +87,13 @@
         customAlert("Startup Error: Please authorize the script in the Apps Script Editor. Details: " + err.message, "App Blocked");
       })
       .getAllUsers();
-    google.script.run.withSuccessHandler(b => { if(b){ document.getElementById('app-logo').src = b; document.getElementById('app-logo').style.display = 'block'; } }).getAppLogo(); 
+      
+    google.script.run.withSuccessHandler(b => { 
+      if(b){ 
+        document.getElementById('app-logo').src = b; 
+        document.getElementById('app-logo').style.display = 'block'; 
+      } 
+    }).getAppLogo(); 
   }
   
   function switchRole() {
@@ -651,3 +665,5 @@ function exportToExcel() {
       })
       .generateLoaderCSVFromFolder(folderId);
   }
+
+  </script>
