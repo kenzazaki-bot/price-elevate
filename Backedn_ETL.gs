@@ -68,13 +68,19 @@ function getItemsForUser(selectedUser, role) {
           const priceList = toJSONSafe(row[0], 'string'); const itemNum = toJSONSafe(row[2], 'string');
           const uniqueKey = f.ae + "||" + priceList + "||" + itemNum;
           const acctNum = toJSONSafe(row[23], 'string'); const acctName = toJSONSafe(row[26], 'string'); const classCode = toJSONSafe(row[27], 'string');
-          let impactStr = acctNum ? `<b>${acctNum}</b>${acctName ? ` - ${acctName}` : ''}${classCode ? ` , ${classCode}` : ''}` : "";
+          let impactStr = acctNum ?
+          `<b>${acctNum}</b>${acctName ? ` - ${acctName}` : ''}${classCode ? ` , ${classCode}` : ''}` : "";
+          
           if (!groups[uniqueKey]) {
             groups[uniqueKey] = {
               key: uniqueKey, rowIds: [], priceList: priceList, itemNum: itemNum, desc: toJSONSafe(row[3], 'string'),
               salesPerson: toJSONSafe(row[24], 'string'), 
               prevPrice: toJSONSafe(row[8], 'number'), 
               currPrice: toJSONSafe(row[5], 'number'), suggPrice: toJSONSafe(row[28], 'number'),
+              
+              lastIncDate: toJSONSafe(row[14], 'string'),
+              currentCost: toJSONSafe(row[15], 'number'),
+              
               estImpact: 0, qty: 0, volDisplay: toJSONSafe(row[20], 'string'), l12mSales: 0, l12mGP: 0,
               finalPrice: (row[31] !== "" && row[31] !== null) ? toJSONSafe(row[31], 'number') : "",
               status: toJSONSafe(row[33], 'string'), comment: toJSONSafe(row[34], 'string'), startDate: toJSONSafe(row[32], 'string'), impacts: []
@@ -124,7 +130,6 @@ function getManagerSummary(forceRefresh) {
     if (!dirSheet) return [];
     const dirData = dirSheet.getDataRange().getValues();
     if (dirData.length < 2) return [];
-    // OPTIMIZATION: Instant load from cached Directory tab if not forcing refresh
     if (!forceRefresh && dirSheet.getLastColumn() >= 11) {
        const managerAgg = {};
        for (let d = 1; d < dirData.length; d++) {
@@ -145,9 +150,8 @@ function getManagerSummary(forceRefresh) {
        return Object.values(managerAgg).sort((a,b) => b.estImpact - a.estImpact);
     }
 
-    // DEEP SCAN: Only runs on ETL execution or when the Manager clicks "Refresh"
     if (dirSheet.getLastColumn() < 11) {
-       dirSheet.getRange(1, 6, 1, 6).setValues([["TOTAL_ITEMS", "PENDING", "APPROVED", "REJECTED", "EST_IMPACT", "REALIZED_IMPACT"]]).setFontWeight("bold").setBackground(COLORS.PRIMARY).setFontColor(COLORS.WHITE);
+       dirSheet.getRange(1, 6, 1, 6).setValues([["TOTAL_ITEMS", "PENDING", "APPROVED", "REJECTED", "EST_IMPACT", "REALIZED_IMPACT"]]).setFontWeight("bold").setBackground("#00505c").setFontColor("#ffffff");
     }
 
     const managerAgg = {};
@@ -187,11 +191,13 @@ function getManagerSummary(forceRefresh) {
               aeStats.total++;
               aeStats.estImpact += g.estImpact;
               if (g.status === "APPROVED") {
+        
                 aeStats.approved++;
                 if (g.finalPrice !== "") aeStats.realized += (g.finalPrice - g.currPrice) * g.qty;
               } else if (g.status === "MODIFIED") { aeStats.approved++; if (g.finalPrice !== "") aeStats.realized += (g.finalPrice - g.currPrice) * g.qty; }
               else if (g.status === "REJECTED") { aeStats.rejected++; } 
-              else aeStats.pending++;
+           
+               else aeStats.pending++;
             });
           }
         } catch(e) { Logger.log("Could not process shard for: " + aeName);
@@ -252,7 +258,7 @@ function submitPortfolio(userName, role) {
     }
 
     if (dirSheet.getRange(1, 5).getValue() === "") {
-       dirSheet.getRange(1, 5).setValue("PORTFOLIO_STATUS").setFontWeight("bold").setBackground(COLORS.PRIMARY).setFontColor(COLORS.WHITE);
+       dirSheet.getRange(1, 5).setValue("PORTFOLIO_STATUS").setFontWeight("bold").setBackground("#00505c").setFontColor("#ffffff");
     }
 
     aeNames.forEach(aeName => {
@@ -266,6 +272,7 @@ function submitPortfolio(userName, role) {
       const outPortfolioStatus = []; 
 
       for (let i = 1; i < data.length; i++) {
+       
         while (data[i].length < 40) data[i].push("");
         let isTargetUser = String(data[i][24]).toLowerCase() === tUser;
         
@@ -274,6 +281,7 @@ function submitPortfolio(userName, role) {
         
         if (isTargetUser && (lineStatus === "" || lineStatus === "PENDING" || lineStatus === "Pending")) {
           lineStatus = "APPROVED";
+          
           finalPrice = data[i][28]; 
         }
         
@@ -320,6 +328,7 @@ function submitReview(updates) {
         if (u.startDate) sheet.getRange(id, 33).setValue(u.startDate);
         if (u.comment) sheet.getRange(id, 35).setValue(u.comment);
       });
+  
     });
   }
   return true;
@@ -347,28 +356,15 @@ function getApprovedAccounts(selectedUser, role) {
   } catch(e) { return []; }
 }
 
-/**
- * Creates a new Google Sheet for the exported data.
- * @param {String} safeDataString - The lightweight 2D array stringified from the frontend.
- * @param {String} userName - The name of the AE for the filename.
- * @returns {String} - The URL of the newly created Google Sheet.
- */
 function createExportSheet(safeDataString, userName) {
   try {
-    // 1. Parse the lightweight data array
     const rows = JSON.parse(safeDataString);
+    if (!rows || rows.length === 0) { throw new Error("No data found on the screen to export."); }
 
-    if (!rows || rows.length === 0) {
-      throw new Error("No data found on the screen to export.");
-    }
-
-    // 2. Create the Google Sheet
     const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd_HH-mm");
     const ssName = "BulkPack_Export_" + userName + "_" + timestamp;
     const ss = SpreadsheetApp.create(ssName);
     const sheet = ss.getActiveSheet();
-    
-    // 3. Define headers
     const headers = [
       "Price List", "Item Num", "Description", "AE Name", 
       "L12M Qty", "L12M Sales $", "L12M GP $", "Start Date",
@@ -376,17 +372,14 @@ function createExportSheet(safeDataString, userName) {
       "Suggested %", "Est Impact", "Final Price", "Final %", 
       "Status", "Comment"
     ];
-    
-    // 4. Combine headers and rows, then paste to the sheet
     const fullData = [headers].concat(rows);
     sheet.getRange(1, 1, fullData.length, headers.length).setValues(fullData);
     
-    // 5. Apply styling and formatting
     sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#00505c").setFontColor("white");
-    sheet.getRange(2, 12, rows.length, 1).setNumberFormat("0.00%"); // Suggested %
-    sheet.getRange(2, 15, rows.length, 1).setNumberFormat("0.00%"); // Final %
-    sheet.getRange(2, 6, rows.length, 2).setNumberFormat("$#,##0.00"); // Sales and GP
-    sheet.getRange(2, 9, rows.length, 3).setNumberFormat("$#,##0.00"); // Prices
+    sheet.getRange(2, 12, rows.length, 1).setNumberFormat("0.00%"); 
+    sheet.getRange(2, 15, rows.length, 1).setNumberFormat("0.00%");
+    sheet.getRange(2, 6, rows.length, 2).setNumberFormat("$#,##0.00");
+    sheet.getRange(2, 9, rows.length, 3).setNumberFormat("$#,##0.00");
     
     sheet.autoResizeColumns(1, headers.length);
     
