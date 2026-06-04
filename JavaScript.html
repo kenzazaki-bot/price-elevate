@@ -1,10 +1,9 @@
 <script>
   let ROW_DATA = []; let PORTFOLIO_STATUS = "Not Submitted"; let USER_CACHE = { AE: [], SC: [] }; let CURRENT_LIST = []; 
   let CAMPAIGN_RULES = []; let pendingAction = null; let debounceTimer; let confirmCallback = null;
-  let currentSort = { col: null, asc: true }; // Tracks table sort state
+  let currentSort = { col: null, asc: true }; 
 
   let DEFAULT_START_DATE = "2026-02-25";
-  alert("Hello! The JavaScript file is working!");
 
   const REQUIRED_MAPPING_FIELDS = [
     { id: 'map_pl', label: 'Price List' }, { id: 'map_item', label: 'Item Number' }, { id: 'map_desc', label: 'Description' },
@@ -12,12 +11,17 @@
     { id: 'map_acct_name', label: 'Account Name' }, { id: 'map_ae', label: 'AE Name (Join Key)' }, { id: 'map_sc', label: 'SC Name (Fallback)' },
     { id: 'map_class', label: 'Class Code' }, { id: 'map_seg1', label: 'Segment 1' }, { id: 'map_seg2', label: 'Segment 2' },
     { id: 'map_seg3', label: 'Segment 3' }, { id: 'map_seg4', label: 'Segment 4' }, { id: 'map_seg5', label: 'Segment 5' },
-    { id: 'map_l12m_sales', label: 'L12M Sales $' }, { id: 'map_l12m_gp', label: 'L12M GP $' }
+    { id: 'map_l12m_sales', label: 'L12M Sales $' }, { id: 'map_l12m_gp', label: 'L12M GP $' },
+    { id: 'map_last_inc_date', label: 'Last Increased Date' }
   ];
 
   const HIERARCHY_MAPPING_FIELDS = [
     { id: 'hmap_ae', label: 'AE Name (Match to CSV)' }, { id: 'hmap_sc', label: 'SC Name' }, 
     { id: 'hmap_mgr', label: 'Manager Name' }, { id: 'hmap_reg', label: 'Region' }, { id: 'hmap_email', label: 'AE Email' }
+  ];
+
+  const COST_MAPPING_FIELDS = [
+    { id: 'cmap_item', label: 'Item Number (Join Key)' }, { id: 'cmap_cost', label: 'Current Cost' }
   ];
 
   function customAlert(msg, title = "Notification") {
@@ -33,28 +37,14 @@
     document.getElementById('custom-modal-msg').innerHTML = msg;
     document.getElementById('btn-custom-cancel').style.display = 'inline-block';
     confirmCallback = callback;
-    
-    document.getElementById('btn-custom-ok').onclick = () => { 
-      document.getElementById('custom-modal-overlay').style.display = 'none'; 
-      if(confirmCallback) confirmCallback(); 
-    };
-    document.getElementById('btn-custom-cancel').onclick = () => { 
-      document.getElementById('custom-modal-overlay').style.display = 'none'; 
-      confirmCallback = null;
-    };
+    document.getElementById('btn-custom-ok').onclick = () => { document.getElementById('custom-modal-overlay').style.display = 'none'; if(confirmCallback) confirmCallback(); };
+    document.getElementById('btn-custom-cancel').onclick = () => { document.getElementById('custom-modal-overlay').style.display = 'none'; confirmCallback = null; };
     document.getElementById('custom-modal-overlay').style.display = 'flex';
   }
 
-  // Check if the browser already finished loading. If yes, run immediately. If not, wait for it.
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initData);
-} else {
-  initData();
-}
+  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initData); } else { initData(); }
   
-function initData() {
-  console.log("TEST 1: initData has started!"); // Add this line!
-    
+  function initData() {
     const container = document.getElementById('role-container');
     if (PAGE_CONTEXT === 'admin') {
         document.getElementById('login-title').innerText = "Admin Access";
@@ -68,7 +58,6 @@ function initData() {
         container.innerHTML = '<label><input type="radio" name="role" value="AE" checked onchange="switchRole()"><span>Account Exec</span></label>';
     }
 
-    // Grab the loader and display it (Removed the duplicate declaration here)
     const loader = document.getElementById('initial-loader');
     loader.style.display = 'flex';
     
@@ -76,24 +65,14 @@ function initData() {
         USER_CACHE = data; 
         DEFAULT_START_DATE = data.defaultDate || "2026-02-25";
         if(document.getElementById('admin-default-date')) document.getElementById('admin-default-date').value = DEFAULT_START_DATE;
-
         if (PAGE_CONTEXT === 'manager') { start(); } else { switchRole(); }
-        
-        // Hide the loader once data is successfully fetched
         loader.style.display = 'none'; 
-      })
-      .withFailureHandler(err => {
+      }).withFailureHandler(err => {
         loader.style.display = 'none';
-        customAlert("Startup Error: Please authorize the script in the Apps Script Editor. Details: " + err.message, "App Blocked");
-      })
-      .getAllUsers();
+        customAlert("Startup Error: " + err.message, "App Blocked");
+      }).getAllUsers();
       
-    google.script.run.withSuccessHandler(b => { 
-      if(b){ 
-        document.getElementById('app-logo').src = b; 
-        document.getElementById('app-logo').style.display = 'block'; 
-      } 
-    }).getAppLogo(); 
+    google.script.run.withSuccessHandler(b => { if(b){ document.getElementById('app-logo').src = b; document.getElementById('app-logo').style.display = 'block'; } }).getAppLogo(); 
   }
   
   function switchRole() {
@@ -117,29 +96,47 @@ function initData() {
   document.addEventListener('click', e => { if (document.querySelector('.dropdown-container') && !document.querySelector('.dropdown-container').contains(e.target)) { document.getElementById('user-list').style.display = 'none'; }});
 
   function start() {
-    const role = document.querySelector('input[name="role"]:checked').value;
-    document.getElementById('login-view').style.display = 'none'; 
-    document.getElementById('btn-back').style.display = 'block';
-    document.getElementById('btn-back').onclick = goBack;
+    try {
+      const role = document.querySelector('input[name="role"]:checked').value;
+      document.getElementById('login-view').style.display = 'none'; 
+      document.getElementById('btn-back').style.display = 'block';
+      document.getElementById('btn-back').onclick = goBack;
 
-    if (role === 'ADMIN') {
-      document.getElementById('admin-view').style.display = 'block'; document.getElementById('current-user').innerText = `Admin Control Panel`;
-    } else if (role === 'MGR') {
-      document.getElementById('btn-back').style.display = 'none';
-      document.getElementById('manager-view').style.display = 'block'; document.getElementById('current-user').innerText = `Manager View`;
-      document.getElementById('manager-table-container').innerHTML = '<div class="loading" style="padding:20px; text-align:center; font-weight:bold;">Loading Manager Data (Fast Cache)...</div>';
-      google.script.run.withSuccessHandler(renderManagerTable).getManagerSummary(false);
-    } else {
-      const user = document.getElementById('user-input').value; if(!user) { document.getElementById('login-view').style.display = 'flex'; document.getElementById('btn-back').style.display = 'none'; return customAlert("Select user."); }
-      document.getElementById('dashboard-view').style.display = 'block'; document.getElementById('current-user').innerText = `${role}: ${user}`;
-      buildTableHeader();
-      google.script.run.withSuccessHandler(r => { ROW_DATA = r.items; PORTFOLIO_STATUS = r.portfolioStatus; renderTable(); }).withFailureHandler(err => { customAlert(err.message); goBack(); }).getItemsForUser(user, role);
+      if (role === 'ADMIN') {
+        document.getElementById('admin-view').style.display = 'block'; document.getElementById('current-user').innerText = `Admin Control Panel`;
+      } else if (role === 'MGR') {
+        document.getElementById('btn-back').style.display = 'none';
+        document.getElementById('manager-view').style.display = 'block'; document.getElementById('current-user').innerText = `Manager View`;
+        document.getElementById('manager-table-container').innerHTML = '<div class="loading" style="padding:20px; text-align:center; font-weight:bold;">Loading Manager Data (Fast Cache)...</div>';
+        google.script.run.withSuccessHandler(renderManagerTable).getManagerSummary(false);
+      } else {
+        const user = document.getElementById('user-input').value; if(!user) { document.getElementById('login-view').style.display = 'flex'; document.getElementById('btn-back').style.display = 'none'; return customAlert("Select user."); }
+        
+        let dashboard = document.getElementById('dashboard-view');
+        if(!dashboard) throw new Error("Dashboard HTML missing!");
+        
+        dashboard.style.display = 'block'; 
+        document.getElementById('current-user').innerText = `${role}: ${user}`;
+        
+        buildTableHeader();
+        
+        google.script.run.withSuccessHandler(r => { 
+          if(!r || !r.items) throw new Error("Backend returned invalid data structure.");
+          ROW_DATA = r.items; 
+          PORTFOLIO_STATUS = r.portfolioStatus; 
+          renderTable(); 
+        }).withFailureHandler(err => { 
+          document.body.innerHTML += `<div style="background:red; color:white; padding:20px; position:absolute; top:50px; left:0; right:0; z-index:99999;">BACKEND ERROR: ${err.message}</div>`;
+        }).getItemsForUser(user, role);
+      }
+    } catch (e) {
+      document.body.innerHTML += `<div style="background:red; color:white; padding:20px; position:absolute; top:50px; left:0; right:0; z-index:99999;">FRONTEND ERROR: ${e.message}</div>`;
     }
   }
 
   function buildTableHeader() {
       document.getElementById('table-container').innerHTML = `
-        <table id="main-data-table" style="min-width: 1500px;">
+        <table id="main-data-table" style="min-width: 1550px;">
           <thead>
             <tr>
               <th width="2%" class="chk-cell"><input type="checkbox" id="master-chk" onclick="toggleAll(this)"></th>
@@ -151,6 +148,7 @@ function initData() {
               <th width="5%"><div class="sort-header" onclick="sortBy('l12mSales')">L12M Sales$ <span class="sort-icon" id="sort-l12mSales"></span></div><input type="text" class="filter-input" data-col="l12mSales" placeholder=">500" onkeyup="triggerFilter()"></th>
               <th width="4%"><div class="sort-header" onclick="sortBy('l12mGP_pct')">L12M GP% <span class="sort-icon" id="sort-l12mGP_pct"></span></div><input type="text" class="filter-input" data-col="l12mGP_pct" onkeyup="triggerFilter()"></th>
               <th width="7%"><div class="sort-header" onclick="sortBy('startDate')">Start Date <span class="sort-icon" id="sort-startDate"></span></div><input type="date" class="filter-input" data-col="startDate" onchange="triggerFilter()"></th>
+              <th width="6%"><div class="sort-header" onclick="sortBy('lastIncDate')">Last Inc Date <span class="sort-icon" id="sort-lastIncDate"></span></div><input type="text" class="filter-input" data-col="lastIncDate" onkeyup="triggerFilter()"></th>
               <th width="5%" class="col-price"><div class="sort-header" onclick="sortBy('prevPrice')">Prev $ <span class="sort-icon" id="sort-prevPrice"></span></div><input type="text" class="filter-input" data-col="prevPrice" onkeyup="triggerFilter()"></th>
               <th width="5%" class="col-price"><div class="sort-header" onclick="sortBy('currPrice')">Curr $ <span class="sort-icon" id="sort-currPrice"></span></div><input type="text" class="filter-input" data-col="currPrice" placeholder=">50" onkeyup="triggerFilter()"></th>
               <th width="5%" class="col-price"><div class="sort-header" onclick="sortBy('suggPrice')">Sugg $ <span class="sort-icon" id="sort-suggPrice"></span></div><input type="text" class="filter-input" data-col="suggPrice" onkeyup="triggerFilter()"></th>
@@ -163,7 +161,7 @@ function initData() {
             </tr>
           </thead>
           <tbody id="table-body">
-            <tr><td colspan="18" style="text-align:center; padding:20px; color:#00505c; font-weight:bold;">Fetching Data from Secure Shard...</td></tr>
+            <tr><td colspan="19" style="text-align:center; padding:20px; color:#00505c; font-weight:bold;">Fetching Data from Secure Shard...</td></tr>
           </tbody>
         </table>
       `;
@@ -201,19 +199,53 @@ function initData() {
   }
 
   function fetchHierarchyHeaders() { const sId = document.getElementById('hier-sheet-id').value; const tName = document.getElementById('hier-tab-name').value; if(!sId || !tName) return customAlert("Need Sheet ID and Tab Name"); const btn = document.getElementById('btn-fetch-hier'); btn.innerText = "Loading..."; btn.disabled = true; google.script.run.withSuccessHandler(h => { btn.innerText = "Fetch Headers"; btn.disabled = false; let opts = `<option value="">-- Ignore --</option>` + h.map((head, i) => `<option value="${i}">${head}</option>`).join(''); document.getElementById('hier-grid-items').innerHTML = HIERARCHY_MAPPING_FIELDS.map(f => `<div class="map-field"><label>${f.label}</label><select id="${f.id}">${opts}</select></div>`).join(''); document.getElementById('hier-mapping-container').style.display = 'block'; }).withFailureHandler(err => { btn.innerText = "Fetch Headers"; btn.disabled = false; customAlert(err.message); }).getHeadersFromHierarchySheet(sId, tName); }
+  
+  function fetchCostHeaders() { 
+    const sId = document.getElementById('cost-sheet-id').value; 
+    const tName = document.getElementById('cost-tab-name').value; 
+    if(!sId || !tName) return customAlert("Need Sheet ID and Tab Name for Cost File"); 
+    const btn = document.getElementById('btn-fetch-cost'); 
+    btn.innerText = "Loading..."; btn.disabled = true; 
+    google.script.run.withSuccessHandler(h => { 
+      btn.innerText = "Fetch Headers"; btn.disabled = false; 
+      let opts = `<option value="">-- Ignore --</option>` + h.map((head, i) => `<option value="${i}">${head}</option>`).join(''); 
+      document.getElementById('cost-grid-items').innerHTML = COST_MAPPING_FIELDS.map(f => `<div class="map-field"><label>${f.label}</label><select id="${f.id}">${opts}</select></div>`).join(''); 
+      document.getElementById('cost-mapping-container').style.display = 'block'; 
+    }).withFailureHandler(err => { 
+      btn.innerText = "Fetch Headers"; btn.disabled = false; 
+      customAlert(err.message); 
+    }).getHeadersFromCostSheet(sId, tName); 
+  }
+
   function loadSegmentsFromCSV() { const payload = { csvFolderId: document.getElementById('drive-folder-id').value, csvMap: {} }; REQUIRED_MAPPING_FIELDS.forEach(f => { payload.csvMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : ""; }); if(!payload.csvFolderId || document.getElementById('map-grid-items').innerHTML === "") { return customAlert("Please complete Step 1 (CSV Ingestion & Mapping) first."); } const btn = document.getElementById('btn-load-segments'); btn.innerText = "Scanning CSVs..."; btn.disabled = true; google.script.run.withSuccessHandler(dims => { btn.innerText = "Segments Loaded!"; if (!dims) return; ['admin-seg1','admin-seg2','admin-seg3','admin-seg4','admin-seg5','admin-class'].forEach(id => { let key = id.replace('admin-',''); if(key==='class') key='classCode'; document.getElementById(id).innerHTML = `<option value="ALL">-- ALL --</option>` + dims[key].map(v => `<option value="${v}">${v}</option>`).join(''); }); document.getElementById('rules-grid-container').style.display = 'block'; }).withFailureHandler(err => { btn.innerText = "Load Segments from Mapped CSVs"; btn.disabled = false; customAlert(err.message); }).getCampaignDimensionsFromCSV(payload); }
   function addCampaignRule() { const pct = parseFloat(document.getElementById('admin-pct').value); if(isNaN(pct)) return customAlert("Valid % required."); CAMPAIGN_RULES.push({ seg1: document.getElementById('admin-seg1').value, seg2: document.getElementById('admin-seg2').value, seg3: document.getElementById('admin-seg3').value, seg4: document.getElementById('admin-seg4').value, seg5: document.getElementById('admin-seg5').value, classCode: document.getElementById('admin-class').value, pct: pct }); renderAdminRules(); }
   function removeAdminRule(index) { CAMPAIGN_RULES.splice(index, 1); renderAdminRules(); }
   function renderAdminRules() { const tb = document.getElementById('admin-rules-body'); if (CAMPAIGN_RULES.length === 0) return tb.innerHTML = `<tr><td colspan="8" style="text-align:center;">No rules.</td></tr>`; tb.innerHTML = CAMPAIGN_RULES.map((r, i) => `<tr><td>${r.seg1}</td><td>${r.seg2}</td><td>${r.seg3}</td><td>${r.seg4}</td><td>${r.seg5}</td><td>${r.classCode}</td><td class="sugg-price">+${r.pct}%</td><td><button class="btn-remove-rule" onclick="removeAdminRule(${i})">Remove</button></td></tr>`).join(''); }
   
   function executeFullPipeline() { 
-    customConfirm("Are you sure? This will execute the Campaign ETL and write new Shard files per AE to Drive.", function() {
+    customConfirm("Are you sure? This will execute the Campaign ETL and write new Shard files per AE.", function() {
       let campNameElem = document.getElementById('admin-campaign-name'); let campaignName = (campNameElem && campNameElem.value) ? campNameElem.value : "BulkPack";
-      const payload = { campaignName: campaignName, csvFolderId: document.getElementById('drive-folder-id').value, csvMap: {}, hierSheetId: document.getElementById('hier-sheet-id').value, hierTab: document.getElementById('hier-tab-name').value, hierMap: {}, campaignRules: CAMPAIGN_RULES }; 
+      const payload = { 
+          campaignName: campaignName, 
+          csvFolderId: document.getElementById('drive-folder-id').value, 
+          csvMap: {}, 
+          hierSheetId: document.getElementById('hier-sheet-id').value, 
+          hierTab: document.getElementById('hier-tab-name').value, 
+          hierMap: {}, 
+          costSheetId: document.getElementById('cost-sheet-id') ? document.getElementById('cost-sheet-id').value : "",
+          costTab: document.getElementById('cost-tab-name') ? document.getElementById('cost-tab-name').value : "",
+          costMap: {},
+          campaignRules: CAMPAIGN_RULES 
+      }; 
       REQUIRED_MAPPING_FIELDS.forEach(f => payload.csvMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : ""); 
       if(payload.csvMap.map_ae === "") return customAlert("CSV Map: 'AE Name' is mandatory for Hub and Spoke routing."); 
       HIERARCHY_MAPPING_FIELDS.forEach(f => payload.hierMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : ""); 
       if(payload.hierMap.hmap_ae === "") return customAlert("Hierarchy Map: 'AE Name' is mandatory to join data."); 
+      
+      if(document.getElementById('cost-mapping-container') && document.getElementById('cost-mapping-container').style.display !== 'none') {
+         COST_MAPPING_FIELDS.forEach(f => payload.costMap[f.id] = document.getElementById(f.id) ? document.getElementById(f.id).value : "");
+      }
+
       const btn = document.getElementById('btn-exec-pipeline'); const resDiv = document.getElementById('pipeline-results'); btn.innerText = "PROCESSING PIPELINE... (DO NOT CLOSE)"; btn.disabled = true; resDiv.innerHTML = "Working... This may take several minutes depending on volume."; 
       google.script.run.withSuccessHandler(r => { btn.innerText = "EXECUTE PIPELINE"; btn.disabled = false; let h = `<strong style="color:var(--pos)">SUCCESS! Processed ${r.processed} Rows into Hub & Spoke Shards.</strong><br><a href="${r.folderUrl}" target="_blank">Open Master Output Folder</a><br><br>`; r.files.forEach(f => h += `• ${f.key} (${f.count} rows) - <a href="${f.url}" target="_blank">View File</a><br>`); resDiv.innerHTML = h; }).withFailureHandler(e => { btn.innerText = "EXECUTE PIPELINE"; btn.disabled = false; resDiv.innerHTML = `<span style="color:red">Error: ${e.message}</span>`; }).runETLPipeline(payload); 
     });
@@ -221,7 +253,6 @@ function initData() {
 
   function formatDateForInput(dateStr) { if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr; return DEFAULT_START_DATE; }
 
-  // --- SORTING & FILTERING UTILITIES ---
   function sortBy(col) {
       if (currentSort.col === col) { currentSort.asc = !currentSort.asc; } 
       else { currentSort.col = col; currentSort.asc = true; }
@@ -248,129 +279,137 @@ function initData() {
   }
 
   function renderTable() {
-    const body = document.getElementById('table-body');
-    const statusView = document.getElementById('status-filter').value;
-    const activeFilters = {}; 
-    document.querySelectorAll('.filter-input').forEach(input => { if (input.value && input.dataset.col) activeFilters[input.dataset.col] = input.value.toLowerCase().trim(); });
+    try {
+      const body = document.getElementById('table-body');
+      if (!body) throw new Error("Table body not found!");
+      const statusView = document.getElementById('status-filter').value;
+      const activeFilters = {}; 
+      document.querySelectorAll('.filter-input').forEach(input => { if (input.value && input.dataset.col) activeFilters[input.dataset.col] = input.value.toLowerCase().trim(); });
 
-    let isFrozen = (PORTFOLIO_STATUS === "Pending Manager Approval" || PORTFOLIO_STATUS === "Pending Approval" || PORTFOLIO_STATUS === "Approved");
-    let disabledAttr = isFrozen ? "disabled" : "";
+      let isFrozen = (PORTFOLIO_STATUS === "Pending Manager Approval" || PORTFOLIO_STATUS === "Pending Approval" || PORTFOLIO_STATUS === "Approved");
+      let disabledAttr = isFrozen ? "disabled" : "";
 
-    if(isFrozen) {
-       document.getElementById('master-chk').disabled = true;
-       document.getElementById('btn-submit-portfolio').style.display = 'none';
-       document.getElementById('portfolio-status-badge').innerText = PORTFOLIO_STATUS;
-       document.getElementById('portfolio-status-badge').style.display = 'inline-block';
-    } else {
-       document.getElementById('master-chk').disabled = false;
-       if(document.querySelector('input[name="role"]:checked') && document.querySelector('input[name="role"]:checked').value === 'MGR'){
-           document.getElementById('btn-submit-portfolio').style.display = 'none';
-       } else {
-           document.getElementById('btn-submit-portfolio').style.display = 'inline-block';
-       }
-       if(PORTFOLIO_STATUS === "Manager Rejected") {
-           document.getElementById('portfolio-status-badge').innerText = "Action Required: " + PORTFOLIO_STATUS;
-           document.getElementById('portfolio-status-badge').style.display = 'inline-block';
-       } else { document.getElementById('portfolio-status-badge').style.display = 'none'; }
-    }
+      if(isFrozen) {
+         document.getElementById('master-chk').disabled = true;
+         document.getElementById('btn-submit-portfolio').style.display = 'none';
+         document.getElementById('portfolio-status-badge').innerText = PORTFOLIO_STATUS;
+         document.getElementById('portfolio-status-badge').style.display = 'inline-block';
+      } else {
+         let chk = document.getElementById('master-chk');
+         if(chk) chk.disabled = false;
+         if(document.querySelector('input[name="role"]:checked') && document.querySelector('input[name="role"]:checked').value === 'MGR'){
+             document.getElementById('btn-submit-portfolio').style.display = 'none';
+         } else {
+             document.getElementById('btn-submit-portfolio').style.display = 'inline-block';
+         }
+         if(PORTFOLIO_STATUS === "Manager Rejected") {
+             document.getElementById('portfolio-status-badge').innerText = "Action Required: " + PORTFOLIO_STATUS;
+             document.getElementById('portfolio-status-badge').style.display = 'inline-block';
+         } else { document.getElementById('portfolio-status-badge').style.display = 'none'; }
+      }
 
-    const numericCols = ['qty', 'l12mSales', 'l12mGP_pct', 'prevPrice', 'currPrice', 'suggPrice', 'suggPct', 'estImpact', 'finalPrice', 'finalPct'];
+      const numericCols = ['qty', 'l12mSales', 'l12mGP_pct', 'prevPrice', 'currPrice', 'suggPrice', 'suggPct', 'estImpact', 'finalPrice', 'finalPct'];
 
-    let visibleItems = ROW_DATA.filter(row => {
-        const status = row.status || "PENDING"; if (statusView !== 'ALL' && status !== statusView) return false;
+      let visibleItems = ROW_DATA.filter(row => {
+          const status = row.status || "PENDING"; if (statusView !== 'ALL' && status !== statusView) return false;
+          
+          for (let col in activeFilters) {
+              let filterVal = activeFilters[col]; 
+              let cellVal = getColValue(row, col);
+
+              if (numericCols.includes(col)) {
+                  let numVal = parseFloat(cellVal);
+                  if (isNaN(numVal)) return false;
+                  
+                  let filterNumStr = filterVal.replace(/[<>=]/g, '').trim();
+                  if (filterNumStr === "") continue; 
+
+                  let filterNum = parseFloat(filterNumStr);
+                  if (isNaN(filterNum)) continue;
+
+                  if (filterVal.startsWith('>=')) { if(numVal < filterNum) return false; }
+                  else if (filterVal.startsWith('<=')) { if(numVal > filterNum) return false; }
+                  else if (filterVal.startsWith('>')) { if(numVal <= filterNum) return false; }
+                  else if (filterVal.startsWith('<')) { if(numVal >= filterNum) return false; }
+                  else if (!numVal.toString().includes(filterNumStr)) { return false; }
+              } else { 
+                  let textVal = (cellVal || "").toString().toLowerCase(); 
+                  if (!textVal.includes(filterVal)) return false; 
+              }
+          } 
+          return true;
+      });
+
+      if (currentSort.col) {
+          visibleItems.sort((a, b) => {
+              let valA = getColValue(a, currentSort.col);
+              let valB = getColValue(b, currentSort.col);
+              if (typeof valA === 'string') valA = valA.toLowerCase();
+              if (typeof valB === 'string') valB = valB.toLowerCase();
+              if (valA < valB) return currentSort.asc ? -1 : 1;
+              if (valA > valB) return currentSort.asc ? 1 : -1;
+              return 0;
+          });
+      }
+
+      updateSortIcons();
+
+      if(visibleItems.length === 0) { body.innerHTML = "<tr><td colspan='19' style='text-align:center; padding:20px; font-weight:bold; color:#a73321;'>✅ No Items Found matching filters</td></tr>"; document.getElementById('stats').innerText = "Showing 0 items"; return; }
+      updateTotals();
+
+      let html = visibleItems.map((row) => {
+        const index = ROW_DATA.indexOf(row);
+        const status = row.status || "PENDING"; 
+        let badgeClass = "badge-pending";
+        if (status === "APPROVED") badgeClass = "badge-approved";
+        else if (status === "REJECTED") badgeClass = "badge-rejected";
+        else if (status === "MODIFIED") badgeClass = "badge-modified";
+
+        let qtyNum = (typeof row.qty === 'number') ? row.qty : parseFloat(row.qty) || 0;
+        let volDisplay = row.volDisplay || qtyNum.toFixed(0); 
+        let finalDisplay = (row.finalPrice !== "" && row.finalPrice !== 0 && row.finalPrice !== null) ? parseFloat(row.finalPrice).toFixed(2) : "";
+        let dateVal = formatDateForInput(row.startDate);
+
+        let suggPct = row.currPrice > 0 ? Math.round(((row.suggPrice - row.currPrice) / row.currPrice) * 100) : 0;
+        let finalPct = row.currPrice > 0 && row.finalPrice ? Math.round(((row.finalPrice - row.currPrice) / row.currPrice) * 100) : "";
         
-        for (let col in activeFilters) {
-            let filterVal = activeFilters[col]; 
-            let cellVal = getColValue(row, col);
+        let modPctVal = finalPct !== "" ? finalPct : suggPct;
+        if (finalDisplay === "") finalDisplay = parseFloat(row.suggPrice || 0).toFixed(2);
 
-            if (numericCols.includes(col)) {
-                let numVal = parseFloat(cellVal);
-                if (isNaN(numVal)) return false;
-                
-                let filterNumStr = filterVal.replace(/[<>=]/g, '').trim();
-                if (filterNumStr === "") continue; 
+        let salesNum = (typeof row.l12mSales === 'number') ? row.l12mSales : parseFloat(row.l12mSales) || 0;
+        let gpNum = (typeof row.l12mGP === 'number') ? row.l12mGP : parseFloat(row.l12mGP) || 0;
 
-                let filterNum = parseFloat(filterNumStr);
-                if (isNaN(filterNum)) continue;
+        let l12mSalesDisplay = "$" + salesNum.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        let gpPct = salesNum > 0 ? ((gpNum / salesNum) * 100).toFixed(1) + "%" : "0.0%";
 
-                if (filterVal.startsWith('>=')) { if(numVal < filterNum) return false; }
-                else if (filterVal.startsWith('<=')) { if(numVal > filterNum) return false; }
-                else if (filterVal.startsWith('>')) { if(numVal <= filterNum) return false; }
-                else if (filterVal.startsWith('<')) { if(numVal >= filterNum) return false; }
-                else if (!numVal.toString().includes(filterNumStr)) { return false; }
-            } else { 
-                let textVal = (cellVal || "").toString().toLowerCase(); 
-                if (!textVal.includes(filterVal)) return false; 
-            }
-        } 
-        return true;
-    });
+        return `<tr id="tr-${index}" class="data-row">
+            <td class="chk-cell"><input type="checkbox" class="row-chk" value="${index}" onchange="updateBulkBar()" ${disabledAttr}></td>
+            <td><div style="font-weight:bold; color:#00505c">${row.priceList || ""}</div></td>
+            <td style="font-weight:bold;">${row.itemNum || ""}</td>
+            <td>${row.desc || ""}</td>
+            <td>${row.salesPerson || ""}</td>
+            <td style="font-weight:bold; color:#555">${volDisplay}</td>
+            <td style="color:#555">${l12mSalesDisplay}</td>
+            <td style="color:#555">${gpPct}</td>
+            <td><input type="date" class="input-editable" style="font-family:'Roboto Mono', monospace;" value="${dateVal}" onchange="updateDate(${index}, this.value)" ${disabledAttr}></td>
+            <td style="color:#555; font-size:0.8rem;">${row.lastIncDate || ""}</td>
+            <td class="col-price" style="color:#777;">$${(row.prevPrice || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            <td class="col-price">$${(row.currPrice || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            <td class="col-price sugg-price">$${(row.suggPrice || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            <td class="col-price sugg-price">${suggPct}%</td>
+            <td class="col-price impact-val">$${(row.estImpact || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            <td class="col-price col-final"><input type="number" step="0.01" class="input-editable" style="font-family:'Roboto Mono', monospace;" value="${finalDisplay}" onchange="updateFinalPriceInline(${index}, this.value)" ${disabledAttr}></td>
+            <td class="col-price"><input type="number" step="1" class="input-editable" style="font-family:'Roboto Mono', monospace;" value="${modPctVal}" onchange="updatePctInline(${index}, this.value)" ${disabledAttr}></td>
+            <td><span id="badge-${index}" class="status-badge ${badgeClass}">${status}</span></td>
+            <td><input type="text" class="input-editable" placeholder="Comment..." value="${row.comment || ""}" onchange="updateCommentInline(${index}, this.value)" ${disabledAttr}></td>
+        </tr>`;
+      }).join('');
 
-    // Deep sorting
-    if (currentSort.col) {
-        visibleItems.sort((a, b) => {
-            let valA = getColValue(a, currentSort.col);
-            let valB = getColValue(b, currentSort.col);
-            
-            if (typeof valA === 'string') valA = valA.toLowerCase();
-            if (typeof valB === 'string') valB = valB.toLowerCase();
-
-            if (valA < valB) return currentSort.asc ? -1 : 1;
-            if (valA > valB) return currentSort.asc ? 1 : -1;
-            return 0;
-        });
+      body.innerHTML = html;
+      document.getElementById('stats').innerText = `Showing ${visibleItems.length} items`;
+    } catch (e) {
+      document.body.innerHTML += `<div style="background:red; color:white; padding:20px; position:absolute; top:50px; left:0; right:0; z-index:99999;">RENDER ERROR: ${e.message}</div>`;
     }
-
-    updateSortIcons();
-
-    if(visibleItems.length === 0) { body.innerHTML = "<tr><td colspan='18' style='text-align:center; padding:20px; font-weight:bold; color:#a73321;'>✅ No Items Found matching filters</td></tr>"; document.getElementById('stats').innerText = "Showing 0 items"; return; }
-    updateTotals();
-
-    let html = visibleItems.map((row) => {
-      const index = ROW_DATA.indexOf(row);
-      const status = row.status || "PENDING"; 
-      let badgeClass = "badge-pending";
-      if (status === "APPROVED") badgeClass = "badge-approved";
-      else if (status === "REJECTED") badgeClass = "badge-rejected";
-      else if (status === "MODIFIED") badgeClass = "badge-modified";
-
-      let volDisplay = row.volDisplay || row.qty.toFixed(0); 
-      let finalDisplay = (row.finalPrice !== "" && row.finalPrice !== 0 && row.finalPrice !== null) ? parseFloat(row.finalPrice).toFixed(2) : "";
-      let dateVal = formatDateForInput(row.startDate);
-
-      let suggPct = row.currPrice > 0 ? Math.round(((row.suggPrice - row.currPrice) / row.currPrice) * 100) : 0;
-      let finalPct = row.currPrice > 0 && row.finalPrice ? Math.round(((row.finalPrice - row.currPrice) / row.currPrice) * 100) : "";
-      
-      let modPctVal = finalPct !== "" ? finalPct : suggPct;
-      if (finalDisplay === "") finalDisplay = parseFloat(row.suggPrice).toFixed(2);
-
-      let l12mSalesDisplay = "$" + row.l12mSales.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-      let gpPct = row.l12mSales > 0 ? ((row.l12mGP / row.l12mSales) * 100).toFixed(1) + "%" : "0.0%";
-
-      return `<tr id="tr-${index}" class="data-row">
-          <td class="chk-cell"><input type="checkbox" class="row-chk" value="${index}" onchange="updateBulkBar()" ${disabledAttr}></td>
-          <td><div style="font-weight:bold; color:#00505c">${row.priceList}</div></td>
-          <td style="font-weight:bold;">${row.itemNum}</td>
-          <td>${row.desc}</td>
-          <td>${row.salesPerson || ""}</td>
-          <td style="font-weight:bold; color:#555">${volDisplay}</td>
-          <td style="color:#555">${l12mSalesDisplay}</td>
-          <td style="color:#555">${gpPct}</td>
-          <td><input type="date" class="input-editable" style="font-family:'Roboto Mono', monospace;" value="${dateVal}" onchange="updateDate(${index}, this.value)" ${disabledAttr}></td>
-          <td class="col-price" style="color:#777;">$${(row.prevPrice || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-          <td class="col-price">$${(row.currPrice || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-          <td class="col-price sugg-price">$${(row.suggPrice || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-          <td class="col-price sugg-price">${suggPct}%</td>
-          <td class="col-price impact-val">$${(row.estImpact || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-          <td class="col-price col-final"><input type="number" step="0.01" class="input-editable" style="font-family:'Roboto Mono', monospace;" value="${finalDisplay}" onchange="updateFinalPriceInline(${index}, this.value)" ${disabledAttr}></td>
-          <td class="col-price"><input type="number" step="1" class="input-editable" style="font-family:'Roboto Mono', monospace;" value="${modPctVal}" onchange="updatePctInline(${index}, this.value)" ${disabledAttr}></td>
-          <td><span id="badge-${index}" class="status-badge ${badgeClass}">${status}</span></td>
-          <td><input type="text" class="input-editable" placeholder="Comment..." value="${row.comment || ""}" onchange="updateCommentInline(${index}, this.value)" ${disabledAttr}></td>
-      </tr>`;
-    }).join('');
-
-    body.innerHTML = html;
-    document.getElementById('stats').innerText = `Showing ${visibleItems.length} items`;
   }
 
   function autoDetermineStatus(item) {
@@ -591,7 +630,6 @@ function exportToExcel() {
      
      customAlert("Preparing data for export... Please wait.", "Exporting");
 
-     // 1. COMPRESS THE DATA: Map only the fields we need into a lightweight 2D array
      const exportRows = ROW_DATA.map(row => {
         let suggPct = row.currPrice > 0 ? ((row.suggPrice - row.currPrice) / row.currPrice) : 0;
         let finalPriceVal = (row.finalPrice !== "" && row.finalPrice !== null) ? row.finalPrice : row.suggPrice;
@@ -618,10 +656,8 @@ function exportToExcel() {
         ];
      });
 
-     // 2. STRINGIFY: This is now a very small, safe string
      const safeDataString = JSON.stringify(exportRows);
 
-     // 3. SEND TO BACKEND
      google.script.run
        .withSuccessHandler(url => {
          window.open(url, '_blank');
@@ -634,36 +670,26 @@ function exportToExcel() {
   }
  function runTheLoader() {
     const folderId = prompt("Enter the Google Drive Folder ID containing the Shard files you want to screen:");
-    if (!folderId) return; // User cancelled
+    if (!folderId) return; 
 
-    // 1. Show the built-in UI loading spinner
     const loader = document.getElementById('initial-loader');
     if(loader) loader.style.display = 'flex';
     
-    // Update the button text to show it's working
     const btn = document.getElementById('btn-run-loader');
     if(btn) { btn.innerText = "Processing Files... Please Wait"; btn.disabled = true; }
 
-    // 2. Call the backend script
     google.script.run
       .withSuccessHandler(res => {
-        // Hide the loader and reset the button
         if(loader) loader.style.display = 'none';
         if(btn) { btn.innerText = "Run The Loader"; btn.disabled = false; }
-        
-        // Open the newly created Google Drive file in a new tab
         window.open(res.url, '_blank');
-        
-        // Show a success message with a clickable link
         customAlert(`Success! Screened ${res.count} files.<br><br>The CSV has been saved to your Google Drive.<br><br><a href="${res.url}" target="_blank" style="color:var(--primary); font-weight:bold; text-decoration:underline;">Click here to view your file</a>`, "Loader Complete");
       })
       .withFailureHandler(err => {
-        // Hide the loader and reset the button on error
         if(loader) loader.style.display = 'none';
         if(btn) { btn.innerText = "Run The Loader"; btn.disabled = false; }
         customAlert("Failed to run The Loader: " + err.message, "Error");
       })
       .generateLoaderCSVFromFolder(folderId);
   }
-
   </script>
