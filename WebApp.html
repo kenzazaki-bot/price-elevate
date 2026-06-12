@@ -57,15 +57,21 @@
           <label>Default Start Date</label>
           <input type="date" id="admin-default-date">
         </div>
+        <!-- NEW FIELD: Letter Template ID -->
+        <div class="admin-field" style="width: 250px;">
+          <label>Letter Template Doc ID</label>
+          <input type="text" id="admin-template-id" placeholder="Google Doc ID...">
+        </div>
         <button class="btn-main" style="width:150px; background:var(--primary);" onclick="saveAdminSettings(this)">Save Settings</button>
       </div>
-  <div style="margin-top: 20px; padding: 15px; background: #e8f5e9; border-radius: 8px; border-left: 5px solid #58b947;">
-  <h3 style="margin-top: 0; color: #2e7d32;">The Loader</h3>
-  <p style="font-size: 0.9rem; color: #555;">Screen an entire folder of AE shards and generate a clean "Price to Load" CSV in Google Drive.</p>
-  <button id="btn-run-loader" class="btn-main" onclick="runTheLoader()" style="background-color: #58b947; width: auto; padding: 10px 20px;">
-    Run The Loader
-  </button>
-</div>
+      <div style="margin-top: 20px; padding: 15px; background: #e8f5e9; border-radius: 8px; border-left: 5px solid #58b947;">
+        <h3 style="margin-top: 0; color: #2e7d32;">The Loader</h3>
+        <p style="font-size: 0.9rem; color: #555;">Screen an entire folder of AE shards and generate a clean "Price to Load" CSV in Google Drive.</p>
+        <button id="btn-run-loader" class="btn-main" onclick="runTheLoader()" style="background-color: #58b947; width: auto; padding: 10px 20px;">
+          Run The Loader
+        </button>
+      </div>
+    </div> 
 
     <div class="admin-rule-builder">
       <h3 style="margin-top:0; color: #333;">Step 1: Raw Data Ingestion & Mapping</h3>
@@ -93,6 +99,19 @@
     </div>
 
     <div class="admin-rule-builder">
+      <h3 style="margin-top:0; color: #333;">Step 2B: Map Separate Cost Data (Optional)</h3>
+      <div style="display:flex; gap: 10px; align-items:center;">
+        <input type="text" id="cost-sheet-id" class="dropdown-input" placeholder="Google Sheet ID..." style="flex:2;">
+        <input type="text" id="cost-tab-name" class="dropdown-input" placeholder="Tab Name..." style="flex:1;">
+        <button class="btn-main" style="width:150px;" id="btn-fetch-cost" onclick="fetchCostHeaders()">Fetch Headers</button>
+      </div>
+      <div id="cost-mapping-container" style="display:none;">
+        <h4 style="color:var(--primary); margin-top: 20px; border-bottom: 1px solid #ccc; padding-bottom: 5px;">Map Cost Columns</h4>
+        <div class="map-grid" id="cost-grid-items"></div>
+      </div>
+    </div>
+
+    <div class="admin-rule-builder">
       <h3 style="margin-top:0; color: #333;">Step 3: Define Target Group & Increase</h3>
       <button class="btn-main" style="width:auto; padding: 8px 20px;" id="btn-load-segments" onclick="loadSegmentsFromCSV()">Load Segments from Mapped CSVs</button>
       <div id="rules-grid-container" style="display:none; margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
@@ -113,21 +132,30 @@
 
     <div class="admin-rule-builder rule-table">
       <h3 style="margin-top:0; color: #333;">Queued Campaign Rules</h3>
-      <table id="admin-rules-table">
+      <table id="admin-rules-table" style="margin-bottom: 20px;">
         <thead><tr><th>Seg 1</th><th>Seg 2</th><th>Seg 3</th><th>Seg 4</th><th>Seg 5</th><th>Class Code</th><th class="col-price">Increase</th><th>Action</th></tr></thead>
         <tbody id="admin-rules-body"><tr><td colspan="8" style="text-align:center; color:#999; padding:20px;">No rules added yet.</td></tr></tbody>
       </table>
+
+      <div style="background: #e3f2fd; border-left: 5px solid #1976d2; padding: 15px; border-radius: 8px;">
+        <h3 style="margin-top:0; color: #1565c0;">Campaign Simulation</h3>
+        <p style="font-size: 0.9rem; color: #555;">Test the financial impact of the rules queued above against the raw CSV data before executing the final pipeline.</p>
+        <div style="display:flex; align-items:center; gap: 20px;">
+          <button class="btn-main" style="background:#1976d2; width:200px;" id="btn-run-sim" onclick="runSimulation()">Run Simulation</button>
+          <div id="sim-results" style="font-size:1.1rem; font-weight:bold; color:var(--primary);"></div>
+        </div>
+      </div>
     </div>
 
     <div class="admin-rule-builder" style="text-align:center; background: #e8f5e9; border: 1px solid #c8e6c9;">
       <h3 style="margin-top:0; color: #2e7d32;">Step 4: Execute ETL Pipeline</h3>
-      <p style="font-size: 0.9rem; color: #555; margin-bottom: 20px;">This will parse all CSVs, join the user hierarchy, run the campaign math, and generate a Hub and Spoke directory mapping.</p>
+      <p style="font-size: 0.9rem; color: #555; margin-bottom: 20px;">This will parse all CSVs, join the user hierarchy and cost data, run the campaign math, and generate a Hub and Spoke directory mapping.</p>
       <button class="btn-main" style="background:var(--pos); width:250px; font-size:1.1rem;" id="btn-exec-pipeline" onclick="executeFullPipeline()">EXECUTE PIPELINE</button>
       <div id="pipeline-results" style="margin-top:15px; text-align:left; font-size:0.9rem;"></div>
     </div>
   </div>
 
-  <div id="dashboard-view">
+  <div id="dashboard-view" style="display:none; padding-top: 20px;">
     <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
       <div class="how-to-text">
         <strong>How to use:</strong> Select lines that need modification. You can edit the blue fields directly.<br>
@@ -149,6 +177,9 @@
         <span style="border-left: 1px solid #ccc; height: 20px; margin: 0 5px;"></span>
         <button class="btn-bulk" style="background:var(--pos);" onclick="bulkDecide('APPROVED')">Approve Selected</button>
         <button class="btn-bulk" style="background:var(--neg);" onclick="openBulkRejectModal()">Reject Selected</button>
+        <span style="border-left: 1px solid #ccc; height: 20px; margin: 0 5px;"></span>
+        <!-- NEW BUTTON FOR PDF EXPORT -->
+        <button class="btn-bulk" style="background:#e67e22;" onclick="generateLetters()">Generate PDFs</button>
       </div>
     </div>
 
@@ -169,7 +200,7 @@
       </div>
       <div id="stats" style="color:#666; font-size:0.9rem;"></div>
     </div>
-    <div id="table-container" style="overflow-x: auto;"></div>
+    <div id="table-container" style="overflow-x: auto; min-height: 400px;"></div>
   </div>
 
   <div id="comment-modal" class="modal-overlay"><div class="modal-box"><h3>Reason Required</h3><textarea id="modal-comment" class="modal-textarea" placeholder="Enter reason..."></textarea><div class="modal-actions"><button class="btn-cancel" onclick="closeModals()">Cancel</button><button class="btn-confirm" onclick="confirmRejection()">Submit</button></div></div></div>
